@@ -1,0 +1,127 @@
+#VRML_SIM R2023b utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/factory/containers/protos/WoodenBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.24564592434707436 -0.7733660759991421 -0.584433907593802 5.287515869996557
+  position -0.5751502517272884 -0.5181927682186191 0.9741260633896376
+  follow "e-puck"
+}
+TexturedBackground {
+  texture "twilight_cloudy_empty"
+}
+TexturedBackgroundLight {
+}
+WoodenBox {
+  translation 0.99 0.5 0.5
+  size 1 1 1
+}
+WoodenBox {
+  translation 0.99 -0.5 0.5
+  name "wooden box(1)"
+  size 1 1 1
+}
+WoodenBox {
+  translation -0.82 -0.5 0.05
+  name "wooden box(2)"
+  size 0.1 0.2 0.1
+}
+E-puck {
+  rotation 0 0 1 0.523599
+  controller "tut1_controller"
+}
+Floor {
+}
+Solid {
+  translation -5 0 0.25
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0 0
+        metalness 0.1
+      }
+      geometry DEF Wall1 Box {
+        size 0.5 10 0.5
+      }
+    }
+  ]
+  name "solid(1)"
+  boundingObject USE Wall1
+}
+Solid {
+  translation 5.26 0 0.25
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0 0
+        metalness 0.1
+      }
+      geometry DEF Wall1 Box {
+        size 0.5 10 0.5
+      }
+    }
+  ]
+  name "solid(2)"
+  boundingObject USE Wall1
+}
+Solid {
+  translation 0.26 5.25 0.25
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0 0
+        metalness 0.1
+      }
+      geometry DEF Wall1 Box {
+        size 0.5 10 0.5
+      }
+    }
+  ]
+  name "solid(3)"
+  boundingObject USE Wall1
+}
+Solid {
+  translation 0.260001 -5.26 0.25
+  rotation 0 0 1 -1.5707953071795862
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0 0
+        metalness 0.1
+      }
+      geometry DEF Wall1 Box {
+        size 0.5 10 0.5
+      }
+    }
+  ]
+  name "solid(4)"
+  boundingObject USE Wall1
+}
+Solid {
+  translation 0.17 0 0.43
+  children [
+    DEF ballShape Shape {
+      appearance PBRAppearance {
+        baseColorMap ImageTexture {
+          url [
+            "../../../Users/jckri/Downloads/51f3da99-7502-4d4e-a1ee-8b20ddec8fdb-amongstus-1826565804.jpg"
+          ]
+        }
+      }
+      geometry Sphere {
+        radius 0.1
+        subdivision 3
+      }
+    }
+  ]
+  boundingObject USE ballShape
+  physics Physics {
+  }
+}
