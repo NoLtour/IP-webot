@@ -57,7 +57,7 @@ if __name__ == "__main__":
         motorR.setVelocity( maxSpeed*(1-2*lAv) )
         motorL.setVelocity( maxSpeed*(1-2*rAv) )
              
-        print( lAv, rAv )
+        print( "it should work right?", lAv, rAv )
         
     
     # Enter here exit cleanup code.

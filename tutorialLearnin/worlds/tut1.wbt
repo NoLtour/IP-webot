@@ -3,15 +3,23 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/factory/containers/protos/WoodenBox.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/gctronic/e-puck/protos/E-puck.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/Floor.proto"
 
 WorldInfo {
+  contactProperties [
+    ContactProperties {
+      material2 "dumbell"
+      coulombFriction [
+        0
+      ]
+      bounce 0
+    }
+  ]
 }
 Viewpoint {
-  orientation 0.24564592434707436 -0.7733660759991421 -0.584433907593802 5.287515869996557
-  position -0.5751502517272884 -0.5181927682186191 0.9741260633896376
-  follow "e-puck"
+  orientation 0.2209668141397301 0.5043176248050576 -0.8347678721416649 0.8161176518946822
+  position -0.9155771238859559 0.5324938642660771 0.6781663664319371
+  followType "None"
 }
 TexturedBackground {
   texture "twilight_cloudy_empty"
@@ -19,11 +27,11 @@ TexturedBackground {
 TexturedBackgroundLight {
 }
 WoodenBox {
-  translation 0.99 0.5 0.5
+  translation 0.99 2.22 0.5
   size 1 1 1
 }
 WoodenBox {
-  translation 0.99 -0.5 0.5
+  translation 0.99 -3.11 0.5
   name "wooden box(1)"
   size 1 1 1
 }
@@ -32,11 +40,149 @@ WoodenBox {
   name "wooden box(2)"
   size 0.1 0.2 0.1
 }
-E-puck {
-  rotation 0 0 1 0.523599
-  controller "tut1_controller"
-}
 Floor {
+}
+Robot {
+  translation 0 0 0.3
+  children [
+    DEF rWheel HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 0 1 0
+        anchor -0.0625 -0.1125 -0.025
+      }
+      device [
+        RotationalMotor {
+          name "right motor"
+        }
+      ]
+      endPoint Solid {
+        translation -0.0625 -0.1125 -0.025
+        rotation 1 4.71026872516771e-16 7.850447875279518e-17 1.5707999999999998
+        children [
+          DEF WheelAcR Shape {
+            appearance PBRAppearance {
+              baseColor 0.427451 0.427451 0.427451
+              baseColorMap ImageTexture {
+                url [
+                  "../../../Users/jckri/Pictures/Capture.PNG"
+                ]
+              }
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.025
+              radius 0.05
+            }
+          }
+        ]
+        name "solid(2)"
+        boundingObject USE WheelAcR
+        physics DEF WHEEL_PH Physics {
+        }
+      }
+    }
+    DEF RoboCoreBlock Shape {
+      appearance PBRAppearance {
+      }
+      geometry Box {
+        size 0.125 0.2 0.1
+      }
+    }
+    DEF lWheel HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 0 1 0
+        anchor -0.0625 0.1125 -0.025
+      }
+      device [
+        DEF WheelLeft RotationalMotor {
+          name "left motor"
+        }
+      ]
+      endPoint Solid {
+        translation -0.0625 0.1125 -0.025
+        rotation 1 4.71026872516771e-16 7.850447875279518e-17 1.5707999999999998
+        children [
+          DEF WheelAcL Shape {
+            appearance PBRAppearance {
+              baseColor 0.427451 0.427451 0.427451
+              baseColorMap ImageTexture {
+                url [
+                  "../../../Users/jckri/Pictures/Capture.PNG"
+                ]
+              }
+              metalness 0
+            }
+            geometry Cylinder {
+              height 0.025
+              radius 0.05
+            }
+          }
+        ]
+        name "solid(1)"
+        boundingObject USE WheelAcL
+        physics DEF WHEEL_PH Physics {
+        }
+      }
+    }
+  ]
+  boundingObject DEF RoboCoreBlock Shape {
+    appearance PBRAppearance {
+    }
+    geometry Box {
+      size 0.125 0.2 0.1
+    }
+  }
+  physics Physics {
+  }
+}
+Solid {
+  translation 0 1.2 0.63
+  children [
+    DEF DBG1 Group {
+      children [
+        Shape {
+          geometry Cylinder {
+            height 0.4
+            radius 0.03
+          }
+        }
+        Pose {
+          translation 0 0 -0.2
+          children [
+            Shape {
+              appearance PBRAppearance {
+              }
+              geometry Sphere {
+                radius 0.1
+              }
+            }
+          ]
+        }
+        Pose {
+          translation 0 0 0.2
+          children [
+            Shape {
+              appearance PBRAppearance {
+                metalness 0.2
+              }
+              geometry Sphere {
+                radius 0.1
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+  name "dunbell"
+  contactMaterial "dumbell"
+  boundingObject USE DBG1
+  physics Physics {
+    mass 2
+    centerOfMass [
+      0 0 0.2
+    ]
+  }
 }
 Solid {
   translation -5 0 0.25
@@ -105,7 +251,7 @@ Solid {
   boundingObject USE Wall1
 }
 Solid {
-  translation 0.17 0 0.43
+  translation 0.17 -0.8 0.43
   children [
     DEF ballShape Shape {
       appearance PBRAppearance {
