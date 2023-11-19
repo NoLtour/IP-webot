@@ -5,7 +5,7 @@ from math import atan2
 from controller import Robot
 from zeroros import Subscriber, Publisher
 from zeroros.messages import geometry_msgs, sensor_msgs, nav_msgs
-from zeroros.message_broker import MessageBroker
+from zeroros.message_broker import MessageBroker 
 
 
 # Check if the platform is windows
@@ -30,9 +30,11 @@ class WebotsController(Robot):
         self.broker = MessageBroker()
         self.laserscan_pub = Publisher("/lidar", sensor_msgs.LaserScan)
         self.odom_pub = Publisher("/odom", nav_msgs.Odometry)
-        self.cmd_vel_sub = Subscriber(
-            "/cmd_vel", geometry_msgs.Twist, self.cmd_vel_callback
+        
+        self.cmd_wh_vel_sub = Subscriber(
+            "/cmd_wh_vel", geometry_msgs.Vector3, self.cmd_wh_vel_callback
         )
+        self.wh_rot_pub = Publisher("/wh_rot", geometry_msgs.Vector3)
 
         timestep = int(self.getBasicTimeStep())
         self.timeStep = timestep * 10
@@ -58,24 +60,46 @@ class WebotsController(Robot):
         self.gyro.enable(self.timeStep)
 
         self.left_motor = self.getDevice("left wheel motor")
-        self.right_motor = self.getDevice("right wheel motor")
-        self.left_motor.setPosition(float("inf"))
-        self.right_motor.setPosition(float("inf"))
+        self.right_motor = self.getDevice("right wheel motor") 
         self.left_motor.setVelocity(0)
         self.right_motor.setVelocity(0)
+        self.left_motor.setPosition( float('inf') )
+        self.right_motor.setPosition( float('inf') )
+        
+        self.left_motor_sensor  = self.getDevice("left wheel sensor")
+        self.right_motor_sensor = self.getDevice("right wheel sensor") 
+        self.left_motor_sensor.enable(self.timeStep)
+        self.right_motor_sensor.enable(self.timeStep)
+        
+        self.leftWheelLastAng = 0
+        self.rightWheelLastAng = 0
 
-    def cmd_vel_callback(self, message):
-        print("Received speed: ", message.linear.x, " and angular: ", message.angular.z)
-        left_speed = message.linear.x - message.angular.z * self.wheel_distance / 2.0
-        right_speed = message.linear.x + message.angular.z * self.wheel_distance / 2.0
-        self.left_motor.setVelocity(left_speed)
-        self.right_motor.setVelocity(right_speed)
+    def cmd_wh_vel_callback(self, message): 
+        self.left_motor.setVelocity( message.x )
+        self.right_motor.setVelocity( message.y )
+
+    def send_wh_rot(self ):   
+        nLAngle = self.left_motor_sensor.getValue()
+        nRAngle = self.right_motor_sensor.getValue()
+        
+        wheelRot_msg = geometry_msgs.Vector3()
+        wheelRot_msg.x = ( nLAngle - self.leftWheelLastAng )
+        wheelRot_msg.y = ( nRAngle - self.rightWheelLastAng )
+    
+        self.leftWheelLastAng = nLAngle
+        self.rightWheelLastAng = nRAngle
+        
+        print( "angChange:" ,wheelRot_msg.x, wheelRot_msg.y )
+         
+        self.wh_rot_pub.publish(wheelRot_msg)
 
     def run(self):
         while self.step(self.timeStep) != -1:
             self.infinite_loop()
 
     def infinite_loop(self):
+        self.send_wh_rot( )
+    
         range_image = self.lidar.getRangeImage()
         msg = sensor_msgs.LaserScan(range_image)
         msg.header.stamp = self.getTime()

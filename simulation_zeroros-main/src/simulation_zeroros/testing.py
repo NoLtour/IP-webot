@@ -81,12 +81,7 @@ class CartesianPose:
         this.x, this.y, this.z = np.matmul(  rotMatrix , this.getNPPosVec()).flat
         this.roll, this.pitch, this.yaw = np.matmul(rotMatrix ,  this.getNPRotVec()).flat
         
-        
-        
-        
-        
-        
-    
+          
 class WheelEncoderCalculator: 
     def __init__(this, wheelDiameter, wheelSeperation):
         this.wheelDiameter = wheelDiameter
@@ -96,6 +91,17 @@ class WheelEncoderCalculator:
         """Returns a CartesianPose for the x, y and yaw result of wheel rotation"""
         
         leftMove = leftRotation * this.wheelDiameter/2
+        
+        if ( leftRotation == rightRotation ):
+            return CartesianPose(
+            leftMove,
+            0,
+            0,
+            0,
+            0,
+            0
+        )
+        
         rightMove = rightRotation   * this.wheelDiameter/2 
         
         turningCirc = this.wheelSeperation * (  2*leftMove/(leftMove-rightMove) - 1 )
@@ -111,11 +117,16 @@ class WheelEncoderCalculator:
             yaw
         )
     
+    def invertProgressionCalc(this, targetAlpha, targetForward):
+        """ This uses a linear approximation to create an inverse function, returning wheel angles for inputs (left angle, right angle) """
+        K = 2*this.wheelSeperation/this.wheelDiameter
+        
+        return K*( targetAlpha + targetForward ), K*( - targetAlpha + targetForward )
 
 
 class PositionTracker:
-    def __init__(this) -> None:
-        this.wheelCalc = WheelEncoderCalculator(9.92, 17.8)
+    def __init__(this, wheelEncoderCalculator) -> None:
+        this.wheelCalc = wheelEncoderCalculator
         
         this.worldPose = CartesianPose(0,0,0,0,0,0)
     
@@ -129,20 +140,70 @@ class PositionTracker:
         # Added onto this world pose
         this.worldPose.addPose( movementPose )
         
+    
         
+class Navigator:
+    #MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
+    
+    def __init__(this, wheelDiameter, wheelSeperation):
+        this.targetNodes = []
+        this.currentTarget = CartesianPose( 0, 0, 0, 0, 0, 0 )
         
+        this.wheelEncoderCalculator = WheelEncoderCalculator( wheelDiameter, wheelSeperation)
+        this.posTracker = PositionTracker( this.wheelEncoderCalculator )    
+        
+        this.checkTarget()
+    
+    def addTarget(this, x, y ):
+        """ Adds a new target, only consider's target x and y since movement's constrained to 2D plane """
+        this.targetNodes.append(
+            CartesianPose( x, y, 0, 0, 0, 0 )
+        )
+        
+    def checkTarget(this):
+        if ( len(this.targetNodes) == 0 ):
+            this.currentTarget = -1
+        
+        elif( this.currentTarget == -1 ):
+            this.currentTarget = this.targetNodes[0]
+            
+        else:
+            # At target conditional
+            return
+            
+        
+    def updatePosition(this, leftAngleChange, rightAngleChange):
+        """ Updates the robot's position based of wheel rotation, equivilent to X*_k = R_BI F(u_k) """
+        this.posTracker.updateWorldPose( leftAngleChange, rightAngleChange )
+        
+    def desiredTargetMVels(this):
+        """ Return's desired motor velocity for reaching target """
+        
+        if ( this.currentTarget == -1 ):
+            if ( len(this.targetNodes) == 0 ):
+                return 0, 0
+            
+            this.currentTarget = this.targetNodes[0]
+                
+        targetDx = this.posTracker.worldPose.x - this.currentTarget.x
+        targetDy = this.posTracker.worldPose.y - this.currentTarget.y
+        
+        targetDYaw = this.posTracker.worldPose.yaw - np.arctan2( targetDx, targetDy )
+        
+        #                                                                     | lazy approximation|
+        leftTarget, rightTarget = this.wheelEncoderCalculator.invertProgressionCalc( targetDYaw, (targetDx + targetDy) )
+        
+        return min(max(leftTarget, -1), 1), min(max(rightTarget, -1), 1)
+        
+
+
+        
+    
 
 
  
-pt = PositionTracker()
 
-pt.updateWorldPose(4, 6)
 
-print("")
-
-pt.updateWorldPose(4, 6)
-
-print("")
 
 
 

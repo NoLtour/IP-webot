@@ -6,49 +6,81 @@ import datetime
 from pathlib import Path
 
 from zeroros import Subscriber, Publisher
-from zeroros.messages import LaserScan, Twist, Odometry
+from zeroros.messages import LaserScan, Twist, Odometry, Vector3
 from zeroros.datalogger import DataLogger
 
 from simulation_zeroros.console import Console
 
-import testing
+import testing as ControllerMaths
+import time
+ 
+_start_millis = -1
+
+def millis():
+    """millis since first robot controller initialisation started"""
+    return (round(time.time() * 1000)) - _start_millis
 
 class RobotController:
-    def __init__(self):
-        self.wheel_distance = 0.135 * 2
-        self.datalog = DataLogger()
+    def __init__(this):
+        this.wheel_distance = 0.135 * 2
+        this.wheel_seperation = 0.075*2
+        #this.datalog = DataLogger()
+        
+        this.navigator = ControllerMaths.Navigator( this.wheel_seperation, this.wheel_distance )
+        this.navigator.addTarget(0.5, 0.2)
 
-        self.laserscan_sub = Subscriber("/lidar", LaserScan, self.laserscan_callback)
-        self.odom_sub = Subscriber("/odom", Odometry, self.odometry_callback)
-        self.cmd_vel_pub = Publisher("/cmd_vel", Twist)
+        this.laserscan_sub = Subscriber("/lidar", LaserScan, this.laserscan_callback)
+        this.odom_sub = Subscriber("/odom", Odometry, this.odometry_callback)
+        
+        this.cmd_wh_vel_pub = Publisher("/cmd_wh_vel", Vector3  )
+        this.get_wh_rot_sub = Subscriber("/wh_rot", Vector3, this.encoder_callback)
 
-    def run(self):
+    def run(this):
         try:
             while True:
-                self.infinite_loop()
+                this.infinite_loop()
         except KeyboardInterrupt:
             print("KeyboardInterrupt received, stopping…")
         except Exception as e:
             print("Exception: ", e)
         finally:
-            self.laserscan_sub.stop()
+            this.laserscan_sub.stop()
 
-    def infinite_loop(self):
-        twist_msg = Twist()
-        twist_msg.linear.x = 4.0
-        twist_msg.angular.z = -1.5
-        self.cmd_vel_pub.publish(twist_msg)
-        self.datalog.log(twist_msg)
+    def infinite_loop(this):
+        """  """
+        
+        this.navigator.checkTarget()
+        
+        lVel, rVel = this.navigator.desiredTargetMVels()
+        
+        this.setWheelVelocity( lVel, rVel )
+        
+    def setWheelVelocity(this, leftVel, rightVel):
+        wheelRot_msg = Vector3()
+        wheelRot_msg.x = leftVel
+        wheelRot_msg.y = rightVel
+        
+        this.cmd_wh_vel_pub.publish(wheelRot_msg)
+        #this.datalog.log(wheelRot_msg)  
+        
+        #print("setting speed:", leftVel, rightVel)
 
-    def odometry_callback(self, msg):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
+    def encoder_callback(this, msg):
+        leftRotation = msg.x
+        rightRotation = msg.y 
+        this.navigator.updatePosition( leftRotation, rightRotation )
+        print("updated positon: ", this.navigator.posTracker.worldPose.x, this.navigator.posTracker.worldPose.y, this.navigator.posTracker.worldPose.yaw)
+        
+
+    def odometry_callback(this, msg):
+        this.x = msg.pose.pose.position.x
+        this.y = msg.pose.pose.position.y
         qw = msg.pose.pose.orientation.w
         qz = msg.pose.pose.orientation.z
-        self.yaw = np.arctan2(2.0 * (qw * qz), 1.0)
-        self.datalog.log(msg)
+        this.yaw = np.arctan2(2.0 * (qw * qz), 1.0)
+        #this.datalog.log(msg)
 
-    def laserscan_callback(self, msg):
+    def laserscan_callback(this, msg):
         """This is a callback function that is called whenever a message is received
 
         The message is of type LaserScan and these are the fields:
@@ -64,9 +96,10 @@ class RobotController:
         - intensities: float32[] - intensity data ## NOT USED ##
         """
         # print("Received message: ", msg)
-        self.laserscan = msg
-        print("Received Lidar ranges: ", msg.ranges)
-        self.datalog.log(msg)
+        this.laserscan = msg
+        #print("Received Lidar ranges: ", msg.ranges)
+        #this.datalog.log(msg)
+ 
 
 def main():
     Console.info("Starting simulation_zeroros...")
@@ -74,8 +107,11 @@ def main():
     # Get YYYYMMDD_HHMMSS timestamp
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     p = Path.cwd() / (str(stamp) + "_simulation_zeroros.log")
-    Console.set_logging_file(p)
-    Console.info("Logging to " + str(p))
+    
+    #Console.set_logging_file(p)
+    #Console.info("Logging to " + str(p))
+    
+    _start_millis = (round(time.time() * 1000))
 
     controller = RobotController()
     controller.run()
@@ -83,6 +119,8 @@ def main():
     print("")
     Console.info("Console log available at: " + str(p))
     Console.info("Data log available at: " + str(controller.datalog.log_file))
+    
+    
 
 if __name__ == "__main__":
     main()
