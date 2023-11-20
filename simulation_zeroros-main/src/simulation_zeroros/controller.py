@@ -22,12 +22,15 @@ def millis():
 
 class RobotController:
     def __init__(this):
-        this.wheel_distance = 0.135 * 2
-        this.wheel_seperation = 0.075*2
+        this.wheel_seperation = 0.172
+        this.wheel_diameter = 0.2435
         #this.datalog = DataLogger()
         
-        this.navigator = ControllerMaths.Navigator( this.wheel_seperation, this.wheel_distance )
-        this.navigator.addTarget(0.5, 0.2)
+        this.navigator = ControllerMaths.Navigator( this.wheel_diameter, this.wheel_seperation )
+        this.navigator.addTarget(1, 0)
+        this.navigator.addTarget(1, 1)
+        this.navigator.addTarget(0, 1)
+        this.navigator.addTarget(0, 0)
 
         this.laserscan_sub = Subscriber("/lidar", LaserScan, this.laserscan_callback)
         this.odom_sub = Subscriber("/odom", Odometry, this.odometry_callback)
@@ -47,14 +50,12 @@ class RobotController:
             this.laserscan_sub.stop()
 
     def infinite_loop(this):
-        """  """
-        
-        this.navigator.checkTarget()
+        """  """ 
         
         lVel, rVel = this.navigator.desiredTargetMVels()
         
-        #this.setWheelVelocity( lVel, rVel )
-        this.setWheelVelocity( 0.5, 1 )
+        this.setWheelVelocity( lVel, rVel )
+        #this.setWheelVelocity( 0.5, 1 )
         
     def setWheelVelocity(this, leftVel, rightVel):
         wheelRot_msg = Vector3()

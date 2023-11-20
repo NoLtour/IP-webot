@@ -5,15 +5,17 @@ import testing as ControllerMaths
 import random
 
 
-maxTime = 112
+maxTime = 4001
 timeStep = 0.05
  
 wheel_seperation = 0.135 * 2
 wheel_diameter   = 0.075*2
 
 navigator = ControllerMaths.Navigator( wheel_diameter, wheel_seperation )
-TARGET = [1,1]
-navigator.addTarget(TARGET[0], TARGET[1])
+TARGET_Xs = [0,1,2,3,4,5,6,7,8,-6,10]
+TARGET_Ys = [2,6,2,6,2,6,2,6,2,20,-30]
+for i in range(0, len(TARGET_Xs)):
+    navigator.addTarget(TARGET_Xs[i], TARGET_Ys[i]) 
 
 actualPose = ControllerMaths.PositionTracker( ControllerMaths.WheelEncoderCalculator( wheel_diameter, wheel_seperation ) )
 
@@ -28,9 +30,12 @@ realX = []
 realY = []
 realAlpha = []
 
+velL = []
+velR = []
+
 t = []
 
-errorFrac = 0.0
+errorFrac = 0.03
 bias = 0.0
 
 def errorMult():
@@ -45,6 +50,9 @@ for i in range(0, int(maxTime/timeStep) ):
 
     velLwh, velRwh = navigator.desiredTargetMVels(  )
     
+    velL.append( velLwh )
+    velR.append( velRwh )
+    
     x.append( navigator.posTracker.worldPose.x )
     y.append( navigator.posTracker.worldPose.y )
     alpha.append( navigator.posTracker.worldPose.yaw )
@@ -58,7 +66,7 @@ for i in range(0, int(maxTime/timeStep) ):
 plot.figure(1234)
 plot.plot( x, y, "b-", label="detec pos" )
 plot.plot( realX, realY, "r--", label="real pos" )
-plot.plot( TARGET[0], TARGET[1], "gx"  )
+plot.plot( TARGET_Xs, TARGET_Ys, "gx"  )
 plot.legend() 
 
 plot.figure(12342)
@@ -70,10 +78,15 @@ plot.plot( t, y, "y", label="detec y" )
 #plot.plot( t, alpha, "b--", label="real alpha" )
 plot.legend() 
 
-plot.figure(123242) 
+"""plot.figure(123242) 
 plot.plot( t, realAlpha, "b--", label="real alpha" )
 plot.plot( t, alpha, "b--", label="detec alpha" )
-plot.legend()
+plot.legend() 
+
+plot.figure(623242) 
+plot.plot( t, velL, "b--", label="velL" )
+plot.plot( t, velR, "r--", label="velR" )
+plot.legend()"""
 plot.show()
 
 

@@ -113,9 +113,9 @@ class WheelEncoderCalculator:
         
         rightMove = rightRotation   * this.wheelDiameter/2 
         
-        turningCirc = this.wheelSeperation * (  2*leftMove/(leftMove-rightMove) - 1 )
+        turningCirc = this.wheelSeperation * (  2*rightMove/(rightMove-leftMove) - 1 )
         
-        yaw = (this.wheelDiameter/(4*this.wheelSeperation))*(leftRotation-rightRotation) #rightMove/((turningCirc - this.wheelSeperation))
+        yaw = (this.wheelDiameter/(4*this.wheelSeperation))*(rightRotation-leftRotation) #rightMove/((turningCirc - this.wheelSeperation))
         
         return CartesianPose(
             turningCirc*np.sin( yaw ),
@@ -153,6 +153,7 @@ class PositionTracker:
         
 class Navigator:
     MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
+    TARGET_HIT_DISTANCE = 0.005
     
     def __init__(this, wheelDiameter, wheelSeperation):
         this.targetNodes = []
@@ -161,7 +162,7 @@ class Navigator:
         this.wheelEncoderCalculator = WheelEncoderCalculator( wheelDiameter, wheelSeperation)
         this.posTracker = PositionTracker( this.wheelEncoderCalculator )    
         
-        this.checkTarget()
+        this.nextTarget()
     
     def addTarget(this, x, y ):
         """ Adds a new target, only consider's target x and y since movement's constrained to 2D plane """
@@ -169,7 +170,7 @@ class Navigator:
             CartesianPose( x, y, 0, 0, 0, 0 )
         )
         
-    def checkTarget(this):
+    def nextTarget(this):
         if ( len(this.targetNodes) == 0 ):
             this.currentTarget = -1
         
@@ -177,7 +178,9 @@ class Navigator:
             this.currentTarget = this.targetNodes[0]
             
         else:
-            # At target conditional
+            this.targetNodes.pop(0)
+            this.currentTarget = -1
+            this.nextTarget()
             return
             
         
@@ -199,8 +202,10 @@ class Navigator:
     QD_C_2 = (-(3*QD_A_2/4 + QD_B_2))
     QD_D_2 = (FWD_R_SPEED)
     
+    ANGLE_SR_GAIN = 10
+    
     def splitWheelVelocity(this, targetAngle):
-        speedRatio= max(min(0.5 + targetAngle/np.pi, 1), 0)
+        speedRatio= max(min(0.5 + Navigator.ANGLE_SR_GAIN*targetAngle/(np.pi*2), 1), 0)
 
         sr2 = speedRatio*speedRatio;
         sr3 = sr2*speedRatio;
@@ -209,7 +214,7 @@ class Navigator:
         leftSpeed  =  ( Navigator.QD_A_2*sr3 + Navigator.QD_B_2*sr2 + Navigator.QD_C_2*speedRatio + Navigator.QD_D_2 ) 
 
         return leftSpeed, rightSpeed
-
+    
     def desiredTargetMVels(this):
         """ Return's desired motor velocity for reaching target """
         
@@ -221,6 +226,10 @@ class Navigator:
                 
         targetDx = this.currentTarget.x - this.posTracker.worldPose.x
         targetDy = this.currentTarget.y - this.posTracker.worldPose.y
+        
+        if ( abs(targetDx) < Navigator.TARGET_HIT_DISTANCE and abs(targetDy) < Navigator.TARGET_HIT_DISTANCE ):
+            this.nextTarget()
+            return this.desiredTargetMVels()
         
         targetDYaw = fixRads( np.arctan2( targetDy, targetDx ) - this.posTracker.worldPose.yaw )
         
