@@ -1,5 +1,14 @@
 import numpy as np
 
+globalLoggs = []
+
+def fixRads( inpRads ):
+    """ mod's input between -pi and +pi """
+    if ( inpRads < 0 ):
+        return np.pi-(np.pi-inpRads)%(np.pi*2)
+
+    return (np.pi+inpRads)%(np.pi*2)-np.pi
+
 class CartesianPose:
     def __init__(this, x, y, z,  roll, pitch, yaw) -> None:
         """stuff
@@ -106,7 +115,7 @@ class WheelEncoderCalculator:
         
         turningCirc = this.wheelSeperation * (  2*leftMove/(leftMove-rightMove) - 1 )
         
-        yaw = rightMove/((turningCirc - this.wheelSeperation))
+        yaw = (this.wheelDiameter/(4*this.wheelSeperation))*(leftRotation-rightRotation) #rightMove/((turningCirc - this.wheelSeperation))
         
         return CartesianPose(
             turningCirc*np.sin( yaw ),
@@ -143,7 +152,7 @@ class PositionTracker:
     
         
 class Navigator:
-    #MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
+    MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
     
     def __init__(this, wheelDiameter, wheelSeperation):
         this.targetNodes = []
@@ -175,7 +184,32 @@ class Navigator:
     def updatePosition(this, leftAngleChange, rightAngleChange):
         """ Updates the robot's position based of wheel rotation, equivilent to X*_k = R_BI F(u_k) """
         this.posTracker.updateWorldPose( leftAngleChange, rightAngleChange )
-        
+ 
+    FWD_R_SPEED = 1
+    BWD_R_SPEED = -1
+    FORWARD_SPEED = 1
+
+    QD_A_1 = (4*(FWD_R_SPEED-BWD_R_SPEED))
+    QD_B_1 = (-(1.5*QD_A_1 + 4*(FORWARD_SPEED-BWD_R_SPEED-QD_A_1/8)))
+    QD_C_1 = (-(3*QD_A_1/4 + QD_B_1))
+    QD_D_1 = (BWD_R_SPEED)
+
+    QD_A_2 = (-QD_A_1)
+    QD_B_2 = (-(1.5*QD_A_2 + 4*(FORWARD_SPEED-FWD_R_SPEED-QD_A_2/8)))
+    QD_C_2 = (-(3*QD_A_2/4 + QD_B_2))
+    QD_D_2 = (FWD_R_SPEED)
+    
+    def splitWheelVelocity(this, targetAngle):
+        speedRatio= max(min(0.5 + targetAngle/np.pi, 1), 0)
+
+        sr2 = speedRatio*speedRatio;
+        sr3 = sr2*speedRatio;
+
+        rightSpeed =  ( Navigator.QD_A_1*sr3 + Navigator.QD_B_1*sr2 + Navigator.QD_C_1*speedRatio + Navigator.QD_D_1 )  
+        leftSpeed  =  ( Navigator.QD_A_2*sr3 + Navigator.QD_B_2*sr2 + Navigator.QD_C_2*speedRatio + Navigator.QD_D_2 ) 
+
+        return leftSpeed, rightSpeed
+
     def desiredTargetMVels(this):
         """ Return's desired motor velocity for reaching target """
         
@@ -185,15 +219,15 @@ class Navigator:
             
             this.currentTarget = this.targetNodes[0]
                 
-        targetDx = this.posTracker.worldPose.x - this.currentTarget.x
-        targetDy = this.posTracker.worldPose.y - this.currentTarget.y
+        targetDx = this.currentTarget.x - this.posTracker.worldPose.x
+        targetDy = this.currentTarget.y - this.posTracker.worldPose.y
         
-        targetDYaw = this.posTracker.worldPose.yaw - np.arctan2( targetDx, targetDy )
+        targetDYaw = fixRads( np.arctan2( targetDy, targetDx ) - this.posTracker.worldPose.yaw )
         
-        #                                                                     | lazy approximation|
-        leftTarget, rightTarget = this.wheelEncoderCalculator.invertProgressionCalc( targetDYaw, (targetDx + targetDy) )
-        
-        return min(max(leftTarget, -1), 1), min(max(rightTarget, -1), 1)
+        #                                                                                         | lazy approximation|
+        #rightTarget, leftTarget = this.wheelEncoderCalculator.invertProgressionCalc( targetDYaw, abs(targetDx + targetDy) )
+
+        return this.splitWheelVelocity( targetDYaw )
         
 
 

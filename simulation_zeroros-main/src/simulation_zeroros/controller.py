@@ -53,7 +53,8 @@ class RobotController:
         
         lVel, rVel = this.navigator.desiredTargetMVels()
         
-        this.setWheelVelocity( lVel, rVel )
+        #this.setWheelVelocity( lVel, rVel )
+        this.setWheelVelocity( 0.5, 1 )
         
     def setWheelVelocity(this, leftVel, rightVel):
         wheelRot_msg = Vector3()
