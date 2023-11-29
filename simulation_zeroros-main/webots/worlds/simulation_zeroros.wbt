@@ -11,10 +11,26 @@ WorldInfo {
   title "Simulation ZeroROS"
   basicTimeStep 8
   lineScale 0.15
+  contactProperties [
+    DEF MaxFric ContactProperties {
+      material1 "roboWheel"
+      coulombFriction [
+        -1
+      ]
+      bounce 0
+    }
+    DEF NoFric ContactProperties {
+      material2 "robo_body"
+      coulombFriction [
+        0
+      ]
+      bounce 0
+    }
+  ]
 }
 Viewpoint {
-  orientation -0.025382604372463514 0.999185606063081 0.03136635190175093 1.361596121295118
-  position -3.710437069026407 0.887229858972156 9.442354388941705
+  orientation -0.005398042650515628 0.9999705508825947 0.005455135479832842 1.5608286177774473
+  position 2.195096398403382 0.8768740726570318 16.370001338783418
   follow "MyBot"
 }
 TexturedBackground {
@@ -25,64 +41,10 @@ RectangleArena {
   floorSize 10 10
   floorTileSize 2 2
   wallThickness 0.5
-  wallHeight 1.4
+  wallHeight 0.5
 }
-DEF GREEN_OBJECT1 Solid {
-  translation 3.05845 3.4612 0.2
-  rotation 0 0 1 3.13621
-  children [
-    DEF BOX_SHAPE Shape {
-      appearance PBRAppearance {
-        baseColor 0 1 0
-        roughness 0.2189099510000001
-        metalness 0
-      }
-      geometry Box {
-        size 0.4 0.8 0.4
-      }
-    }
-  ]
-  name "green object 1"
-  boundingObject USE BOX_SHAPE
-}
-DEF GREEN_OBJECT2 Solid {
-  translation 3.07181 3.2108 0.56
-  rotation 0 0 1 3.13621
-  children [
-    USE BOX_SHAPE
-  ]
-  name "green object 2"
-  boundingObject USE BOX_SHAPE
-}
-DEF GREEN_OBJECT3 Solid {
-  translation 3.06239 2.5483 0.2
-  rotation 0 0 1 3.13621
-  children [
-    USE BOX_SHAPE
-  ]
-  name "green object 3"
-  boundingObject USE BOX_SHAPE
-}
-DEF GREEN_OBJECT4 Solid {
-  translation 3.11435 4.3357 0.3
-  rotation 0 0 1 3.13621
-  children [
-    USE BOX_SHAPE
-  ]
-  name "green object 4"
-  boundingObject USE BOX_SHAPE
-}
-DEF GREEN_OBJECT5 Solid {
-  translation -3.96256 -2.22486 0.3
-  rotation 0 0 1 -2.623375
-  children [
-    USE BOX_SHAPE
-  ]
-  name "green object 5"
-  boundingObject USE BOX_SHAPE
-}
-DEF PINK_OBJECT1 Solid {
-  translation 2 3 0.47
+DEF PINK_OBJECT3 Solid {
+  translation -2 -2 0.39
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -92,33 +54,212 @@ DEF PINK_OBJECT1 Solid {
       }
       geometry Cylinder {
         height 0.8
-        radius 0.3
+        radius 0.15
         subdivision 20
       }
     }
   ]
-  name "pink object 1"
-  boundingObject USE CYLINDER_SHAPE
-}
-DEF PINK_OBJECT2 Solid {
-  translation 0 3 0.47
-  children [
-    USE CYLINDER_SHAPE
-  ]
-  name "pink object 2"
-  boundingObject USE CYLINDER_SHAPE
+  name "pink object 3"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -2 3 0.54
+  translation 0 -2 0.39
   children [
-    USE CYLINDER_SHAPE
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.15
+        subdivision 20
+      }
+    }
   ]
-  name "pink object 3"
-  boundingObject USE CYLINDER_SHAPE
+  name "pink object 3(2)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
+}
+DEF PINK_OBJECT3 Solid {
+  translation 2 -2 0.4
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.15
+        subdivision 20
+      }
+    }
+  ]
+  name "pink object 3(3)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
+}
+DEF PINK_OBJECT3 Solid {
+  translation 2 0 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry DEF PBOX Box {
+        size 0.3 0.3 0.8
+      }
+    }
+  ]
+  name "pink object 3(4)"
+  boundingObject USE PBOX
+}
+DEF PINK_OBJECT3 Solid {
+  translation 0 0 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry DEF PBOX Box {
+        size 0.3 0.3 0.8
+      }
+    }
+  ]
+  name "pink object 3(5)"
+  boundingObject USE PBOX
+}
+DEF PINK_OBJECT3 Solid {
+  translation -2 0 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.15
+        subdivision 20
+      }
+    }
+  ]
+  name "pink object 3(1)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
+}
+DEF PINK_OBJECT3 Solid {
+  translation -3.98 0.66 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.15
+        subdivision 20
+      }
+    }
+  ]
+  name "pink object 3(6)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
+}
+DEF PINK_OBJECT3 Solid {
+  translation -3.98 -1.34 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.15
+        subdivision 20
+      }
+    }
+  ]
+  name "pink object 3(7)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.15
+      subdivision 20
+    }
+  }
 }
 DEF ROBOT Robot {
-  translation -1.95614 0.998001 -0.00402986
-  rotation 0.019634695752092056 -0.011350997544245489 0.9997427837086265 -1.5755253071795865
+  translation 3.00446 1.02169 0.0059598
+  rotation 0 0 1 -1.5660653071795858
   children [
     Gyro {
     }
@@ -160,8 +301,8 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999999215 0.075
-        rotation 0.6492952158314799 -0.6492953991282577 0.3960192007582821 3.8957326918827637
+        translation 0 0.1349999999999905 0.075
+        rotation 0.6492952158314784 -0.6492953991282594 0.39601920075828145 3.8957326918827664
         children [
           DEF WHEEL Pose {
             rotation 0.577656895078166 0.5771968951617173 -0.5771968951617173 -2.093935
@@ -182,6 +323,7 @@ DEF ROBOT Robot {
           }
         ]
         name "left wheel"
+        contactMaterial "roboWheel"
         boundingObject USE WHEEL
         physics DEF PHYSICS_WHEEL Physics {
           density -1
@@ -206,12 +348,13 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 -0.135 0.075
-        rotation 0.6846198636849945 -0.6846198015442201 -0.25018267242455494 2.651291522769965
+        translation 0 -0.13499999999999895 0.075
+        rotation 0.6846198636849928 -0.6846198015442219 -0.2501826724245547 2.6512915227699625
         children [
           USE WHEEL
         ]
         name "right wheel"
+        contactMaterial "roboWheel"
         boundingObject USE WHEEL
         physics USE PHYSICS_WHEEL
       }

@@ -30,11 +30,19 @@ class RobotController:
         this.wheel_diameter = 0.20454
         #this.datalog = DataLogger()
         
+        """this.wheel_seperation = 0.135
+        this.wheel_diameter = 0.135"""
+        
         this.navigator = ControllerMaths.Navigator( this.wheel_diameter, this.wheel_seperation )
-        this.navigator.addTarget(1, 0)
+        this.navigator.addTarget(2, 0)
+        this.navigator.addTarget(2, -6)
+        this.navigator.addTarget(0, -6)
+        this.navigator.addTarget(0, 0)
+        
+        """this.navigator.addTarget(1, 0)
         this.navigator.addTarget(1, 1)
         this.navigator.addTarget(0, 1)
-        this.navigator.addTarget(0, 0)
+        this.navigator.addTarget(0, 0)"""
 
         this.laserscan_sub = Subscriber("/lidar", LaserScan, this.laserscan_callback)
         this.odom_sub = Subscriber("/odom", Odometry, this.odometry_callback)
