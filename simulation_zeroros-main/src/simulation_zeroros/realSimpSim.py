@@ -2,8 +2,11 @@ import matplotlib.pyplot as plot
 
 import testing as ControllerMaths
 
+from time import sleep as delay
+
 import random
 
+import livePlotter as lp
 
 maxTime = 4001
 timeStep = 0.05
@@ -12,8 +15,8 @@ wheel_seperation = 0.135 * 2
 wheel_diameter   = 0.075*2
 
 navigator = ControllerMaths.Navigator( wheel_diameter, wheel_seperation )
-TARGET_Xs = [0,1,2,3,4,5,6,7,8,-6,10]
-TARGET_Ys = [2,6,2,6,2,6,2,6,2,20,-30]
+TARGET_Xs = [0, 4, 0]
+TARGET_Ys = [4, 4, 0]
 for i in range(0, len(TARGET_Xs)):
     navigator.addTarget(TARGET_Xs[i], TARGET_Ys[i]) 
 
@@ -41,7 +44,19 @@ bias = 0.0
 def errorMult():
     return ((random.random()-0.5)*errorFrac + 1 )
 
+shownPrev = False
+
+dispWind = lp.PlotWindow( 3,3 )
+roboDisp = lp.RobotDisplay(0,0,3,3, dispWind, -5, 5, -5, 5)
+
+def showChartLive():
+    roboDisp.parseData( navigator.posTracker.worldPose, [[],[]] )
+    dispWind.render()
+    
+
 for i in range(0, int(maxTime/timeStep) ): 
+    delay(0.01) 
+    
     lEncoderChange = velLwh*timeStep 
     rEncoderChange = velRwh*timeStep  
 
@@ -62,6 +77,8 @@ for i in range(0, int(maxTime/timeStep) ):
     realAlpha.append( actualPose.worldPose.yaw )
 
     t.append( i * timeStep )
+    
+    showChartLive()
 
 plot.figure(1234)
 plot.plot( x, y, "b-", label="detec pos" )

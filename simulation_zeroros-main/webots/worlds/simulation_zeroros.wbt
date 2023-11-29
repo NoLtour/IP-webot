@@ -13,8 +13,8 @@ WorldInfo {
   lineScale 0.15
 }
 Viewpoint {
-  orientation -0.005398164395531116 0.999972751129766 0.005035555493253471 1.6408263521704853
-  position 0.8748300473179311 -0.8707491725104565 13.990179579829077
+  orientation -0.025382604372463514 0.999185606063081 0.03136635190175093 1.361596121295118
+  position -3.710437069026407 0.887229858972156 9.442354388941705
   follow "MyBot"
 }
 TexturedBackground {
@@ -28,7 +28,7 @@ RectangleArena {
   wallHeight 1.4
 }
 DEF GREEN_OBJECT1 Solid {
-  translation 3.0466 1.1512 0.2
+  translation 3.05845 3.4612 0.2
   rotation 0 0 1 3.13621
   children [
     DEF BOX_SHAPE Shape {
@@ -46,7 +46,7 @@ DEF GREEN_OBJECT1 Solid {
   boundingObject USE BOX_SHAPE
 }
 DEF GREEN_OBJECT2 Solid {
-  translation 3.0576 0.5008 0.56
+  translation 3.07181 3.2108 0.56
   rotation 0 0 1 3.13621
   children [
     USE BOX_SHAPE
@@ -55,7 +55,7 @@ DEF GREEN_OBJECT2 Solid {
   boundingObject USE BOX_SHAPE
 }
 DEF GREEN_OBJECT3 Solid {
-  translation 3.0481 -0.2017 0.2
+  translation 3.06239 2.5483 0.2
   rotation 0 0 1 3.13621
   children [
     USE BOX_SHAPE
@@ -64,7 +64,7 @@ DEF GREEN_OBJECT3 Solid {
   boundingObject USE BOX_SHAPE
 }
 DEF GREEN_OBJECT4 Solid {
-  translation 3.0841 -1.4843 0.3
+  translation 3.11435 4.3357 0.3
   rotation 0 0 1 3.13621
   children [
     USE BOX_SHAPE
@@ -73,7 +73,7 @@ DEF GREEN_OBJECT4 Solid {
   boundingObject USE BOX_SHAPE
 }
 DEF GREEN_OBJECT5 Solid {
-  translation -2.7202 -1.5167 0.3
+  translation -3.96256 -2.22486 0.3
   rotation 0 0 1 -2.623375
   children [
     USE BOX_SHAPE
@@ -117,7 +117,7 @@ DEF PINK_OBJECT3 Solid {
   boundingObject USE CYLINDER_SHAPE
 }
 DEF ROBOT Robot {
-  translation 0.0352743 -1.01094 -0.0193768
+  translation -1.95614 0.998001 -0.00402986
   rotation 0.019634695752092056 -0.011350997544245489 0.9997427837086265 -1.5755253071795865
   children [
     Gyro {
@@ -160,8 +160,8 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999999276 0.075
-        rotation 0.6492952158314799 -0.6492953991282576 0.3960192007582821 3.8957326918827637
+        translation 0 0.13499999999999215 0.075
+        rotation 0.6492952158314799 -0.6492953991282577 0.3960192007582821 3.8957326918827637
         children [
           DEF WHEEL Pose {
             rotation 0.577656895078166 0.5771968951617173 -0.5771968951617173 -2.093935
@@ -173,8 +173,9 @@ DEF ROBOT Robot {
                   metalness 0
                 }
                 geometry Cylinder {
-                  height 0.03
-                  radius 0.075
+                  height 0.0005
+                  radius 0.0715
+                  subdivision 50
                 }
               }
             ]
@@ -337,6 +338,7 @@ DEF ROBOT Robot {
     }
   ]
   name "MyBot"
+  contactMaterial "robo_body"
   boundingObject Pose {
     translation 0 0 0.1245
     rotation 0 0 1 -1.570796

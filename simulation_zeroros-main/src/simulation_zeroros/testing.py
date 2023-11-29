@@ -1,4 +1,6 @@
-import numpy as np
+import numpy as np  
+from typing import List
+from dataclasses import dataclass, field
 
 globalLoggs = []
 
@@ -67,8 +69,7 @@ class CartesianPose:
         this.roll += inputPose.roll
         this.pitch += inputPose.pitch
         this.yaw += inputPose.yaw
-        
-        
+          
     def rotatePose(this, roll, pitch, yaw):
         """Rotates this pose using the inputs given"""
         
@@ -148,8 +149,7 @@ class PositionTracker:
         
         # Added onto this world pose
         this.worldPose.addPose( movementPose )
-        
-    
+         
         
 class Navigator:
     MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
@@ -237,8 +237,33 @@ class Navigator:
         #rightTarget, leftTarget = this.wheelEncoderCalculator.invertProgressionCalc( targetDYaw, abs(targetDx + targetDy) )
 
         return this.splitWheelVelocity( targetDYaw )
-        
 
+@dataclass
+class PointCloud:
+    pointXs: List[float] = field(default_factory=list)
+    pointYs: List[float] = field(default_factory=list)
+
+class ProtoLIDARInterp:
+    
+    
+    def __init__(this):
+        this.lPointCloud = PointCloud()
+    
+    def calculateAbsolutePositions(this, rootPose, lidarOup ): 
+        cRangeAngle = -lidarOup.angle_min + rootPose.yaw
+        originX = rootPose.x
+        originY = rootPose.y
+        
+        nPointCloud = PointCloud()
+        
+        for cScanRange in lidarOup.ranges:
+            nPointCloud.pointXs.append( originX + cScanRange*np.cos( cRangeAngle ) )
+            nPointCloud.pointYs.append( originY + cScanRange*np.sin( cRangeAngle ) )
+            
+            cRangeAngle -= lidarOup.angle_increment
+            
+        this.lPointCloud = nPointCloud
+        
 
         
     

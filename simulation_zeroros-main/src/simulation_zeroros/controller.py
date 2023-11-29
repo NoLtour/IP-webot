@@ -12,7 +12,11 @@ from zeroros.datalogger import DataLogger
 from simulation_zeroros.console import Console
 
 import testing as ControllerMaths
-import time
+import time 
+import livePlotter as lp
+ 
+lpWindow = lp.PlotWindow(10, 10)
+lpRoboDisplay = lp.RobotDisplay(0,0,10,10,lpWindow, -9, 9, -9, 9)
  
 _start_millis = -1
 
@@ -22,8 +26,8 @@ def millis():
 
 class RobotController:
     def __init__(this):
-        this.wheel_seperation = 0.172
-        this.wheel_diameter = 0.2435
+        this.wheel_seperation = 0.135
+        this.wheel_diameter = 0.20454
         #this.datalog = DataLogger()
         
         this.navigator = ControllerMaths.Navigator( this.wheel_diameter, this.wheel_seperation )
@@ -37,6 +41,8 @@ class RobotController:
         
         this.cmd_wh_vel_pub = Publisher("/cmd_wh_vel", Vector3  )
         this.get_wh_rot_sub = Subscriber("/wh_rot", Vector3, this.encoder_callback)
+        
+        this.lidarInterper = ControllerMaths.ProtoLIDARInterp()
 
     def run(this):
         try:
@@ -53,6 +59,9 @@ class RobotController:
         """  """ 
         
         lVel, rVel = this.navigator.desiredTargetMVels()
+        
+        lpRoboDisplay.parseData( this.navigator.posTracker.worldPose, [this.lidarInterper.lPointCloud.pointXs,this.lidarInterper.lPointCloud.pointYs] ) 
+        lpWindow.render()
         
         this.setWheelVelocity( lVel, rVel )
         #this.setWheelVelocity( 0.5, 1 )
@@ -72,6 +81,8 @@ class RobotController:
         rightRotation = msg.y 
         this.navigator.updatePosition( leftRotation, rightRotation )
         print("updated positon: ", this.navigator.posTracker.worldPose.x, this.navigator.posTracker.worldPose.y, this.navigator.posTracker.worldPose.yaw)
+         
+         
         
 
     def odometry_callback(this, msg):
@@ -99,6 +110,10 @@ class RobotController:
         """
         # print("Received message: ", msg)
         this.laserscan = msg
+        
+        this.lidarInterper.calculateAbsolutePositions( this.navigator.posTracker.worldPose, msg )
+        
+        ""
         #print("Received Lidar ranges: ", msg.ranges)
         #this.datalog.log(msg)
  
