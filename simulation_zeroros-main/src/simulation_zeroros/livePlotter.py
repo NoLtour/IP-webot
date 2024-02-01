@@ -5,6 +5,9 @@ from time import time as getTime
 import numpy as np
 
 from testing import CartesianPose
+ 
+
+FIGURE_SCALING = 1
 
 class PlotWindow:
     """ Acts as a window for hosting displays, it's broken into a grid onto which displays are placed """
@@ -16,7 +19,7 @@ class PlotWindow:
         this.height = height
         this.minRenderDelay = 1/maxRPS
         
-        this.fig = plt.figure()
+        this.fig = plt.figure( figsize=(height*FIGURE_SCALING, width*FIGURE_SCALING) )
         
         this.slaveDisplays = []
         
@@ -134,7 +137,37 @@ class LineGraphDisplay( PlotDisplay ):
         this.graph.set_data( this.xValues, this.yValues )
         this.subAxis.draw_artist( this.graph )
         
-            
+    
+class GidGraphDisplay( PlotDisplay ):
+    """Simple x-y plot, uses fixed axis"""
+    
+    def __init__(this, xPosition, yPosition, width, height, parentWindow,  xMax,   yMax, xLabel="", yLabel="", title=""): 
+        super().__init__( xPosition, yPosition, width, height, parentWindow )  
+         
+        this.gData = np.random.random( (xMax, yMax) )
+        
+        this.xMax = xMax
+        this.yMax = yMax
+        
+        this.gridGraph = this.subAxis.imshow(this.gData, cmap='gray', interpolation='none', origin='lower', extent=[0, xMax, 0, yMax])
+        
+        this.subAxis.set_xlim( 0, xMax )
+        this.subAxis.set_ylim( 0, yMax )
+        
+    def randomData(this): 
+        this.parseData( np.random.random( (this.width, this.height) ) )
+        
+    def parseData(this, nData):
+        super().parseData() 
+        this.gData = nData
+        
+    def update(this):
+        super().update()
+        this.gridGraph.set_data( this.gData )
+        this.subAxis.draw_artist( this.gridGraph )
+        
+
+
 class PoseDisplay( PlotDisplay ):
     """Displays poses from a topdown perspective"""
     

@@ -7,6 +7,7 @@ from time import sleep as delay
 import random
 
 import livePlotter as lp
+from ProbabilityGrid import ProbabiltyGrid
 
 maxTime = 4001
 timeStep = 0.05
@@ -15,8 +16,8 @@ wheel_seperation = 0.135 * 2
 wheel_diameter   = 0.075*2
 
 navigator = ControllerMaths.Navigator( wheel_diameter, wheel_seperation )
-TARGET_Xs = [0, 4, 0]
-TARGET_Ys = [4, 4, 0]
+TARGET_Xs = [0, 2, 0]
+TARGET_Ys = [2, 2, 0]
 for i in range(0, len(TARGET_Xs)):
     navigator.addTarget(TARGET_Xs[i], TARGET_Ys[i]) 
 
@@ -46,11 +47,29 @@ def errorMult():
 
 shownPrev = False
 
-dispWind = lp.PlotWindow( 3,3 )
-roboDisp = lp.RobotDisplay(0,0,3,3, dispWind, -5, 5, -5, 5)
+dispWind = lp.PlotWindow( 3,6 )
+roboDisp = lp.RobotDisplay(0,0,3,3, dispWind, -5, 5, -5, 5) 
+
+probGrid = ProbabiltyGrid(-5, 5, -5, 5, 30)
+
+gridDisp = lp.GidGraphDisplay(3,0,6,6, dispWind, probGrid.width, probGrid.height) 
 
 def showChartLive():
     roboDisp.parseData( navigator.posTracker.worldPose, [[],[]] )
+    
+    gridPos = probGrid.getCellAt( navigator.posTracker.worldPose.x, navigator.posTracker.worldPose.y )
+    
+    probGrid.addValue( int( gridPos[0] ), gridPos[1], 0.5 )
+    probGrid.debugLinecast( navigator.posTracker.worldPose.x, navigator.posTracker.worldPose.y, navigator.posTracker.worldPose.yaw-0.3, 1.5 )
+    probGrid.debugLinecast( navigator.posTracker.worldPose.x, navigator.posTracker.worldPose.y, navigator.posTracker.worldPose.yaw+0.3, 1.5 )
+    
+    probGrid.debugLinecast( -1, -1, (3.14159/3) + 3.14159, 2 )
+    probGrid.debugLinecast( -1, -1, (3.14159/3) + 3.14159/2, 2 )
+    probGrid.debugLinecast( -1, -1, (3.14159/3) + 3.14159*3/2, 2 )
+    probGrid.debugLinecast( -1, -1, (3.14159/3) + 3.14159*4, 2 )
+    
+    gridDisp.parseData( probGrid.gridData )
+    
     dispWind.render()
     
 

@@ -1,5 +1,5 @@
 import sys
-print(sys.path)
+print(sys.path) 
 
 import numpy as np
 import datetime
@@ -12,11 +12,23 @@ from zeroros.datalogger import DataLogger
 from simulation_zeroros.console import Console
 
 import testing as ControllerMaths
+
 import time 
 import livePlotter as lp
+
+class MAP_PROP:
+    X_MIN = -9
+    X_MAX = 9
+    Y_MIN = -9
+    Y_MAX = 9
+    
+    PROB_GRID_RES = 25
  
-lpWindow = lp.PlotWindow(10, 10)
-lpRoboDisplay = lp.RobotDisplay(0,0,10,10,lpWindow, -9, 9, -9, 9)
+
+lpWindow = lp.PlotWindow(5, 15)
+lpRoboDisplay = lp.RobotDisplay(0,0,5,5,lpWindow, MAP_PROP.X_MIN, MAP_PROP.X_MAX, MAP_PROP.Y_MIN, MAP_PROP.Y_MAX)
+gridDisp      = lp.GidGraphDisplay(5,0,5,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
+gridDisp2     = lp.GidGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
  
 _start_millis = -1
 
@@ -35,8 +47,8 @@ class RobotController:
         
         this.navigator = ControllerMaths.Navigator( this.wheel_diameter, this.wheel_seperation )
         this.navigator.addTarget(2, 0)
-        this.navigator.addTarget(2, -6)
-        this.navigator.addTarget(0, -6)
+        this.navigator.addTarget(2, -2)
+        this.navigator.addTarget(0, -2)
         this.navigator.addTarget(0, 0)
         
         """this.navigator.addTarget(1, 0)
@@ -49,8 +61,8 @@ class RobotController:
         
         this.cmd_wh_vel_pub = Publisher("/cmd_wh_vel", Vector3  )
         this.get_wh_rot_sub = Subscriber("/wh_rot", Vector3, this.encoder_callback)
-        
-        this.lidarInterper = ControllerMaths.ProtoLIDARInterp()
+         
+        this.gridMapper = ControllerMaths.GridMapper( this.navigator, MAP_PROP.X_MIN, MAP_PROP.X_MAX, MAP_PROP.Y_MIN, MAP_PROP.Y_MAX, MAP_PROP.PROB_GRID_RES )
 
     def run(this):
         try:
@@ -68,7 +80,18 @@ class RobotController:
         
         lVel, rVel = this.navigator.desiredTargetMVels()
         
-        lpRoboDisplay.parseData( this.navigator.posTracker.worldPose, [this.lidarInterper.lPointCloud.pointXs,this.lidarInterper.lPointCloud.pointYs] ) 
+        lpRoboDisplay.parseData( this.navigator.posTracker.worldPose, [this.gridMapper.lastScanCloud.pointXs, this.gridMapper.lastScanCloud.pointYs] ) 
+        if ( len(this.gridMapper.allMeanPLMs) != 0 ):
+            gridDisp.parseData( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData )
+        
+        #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )
+         
+        #yPoints, xPoints = np.where( foundInterceptGrid ) 
+        #pointCloudIG = np.array( [xPoints, yPoints, np.zeros(yPoints.shape)] ) 
+        
+        #this.gridMapper.simpleICPSolve( foundInterceptGrid, pointCloudNP )
+        
+        #gridDisp2.parseData( foundInterceptGrid )
         lpWindow.render()
         
         this.setWheelVelocity( lVel, rVel )
@@ -119,7 +142,7 @@ class RobotController:
         # print("Received message: ", msg)
         this.laserscan = msg
         
-        this.lidarInterper.calculateAbsolutePositions( this.navigator.posTracker.worldPose, msg )
+        this.gridMapper.pushScanCloud( ControllerMaths.ProtoLIDARInterp.calculateAbsolutePositions( this.navigator.posTracker.worldPose, msg ) )
         
         ""
         #print("Received Lidar ranges: ", msg.ranges)
@@ -143,7 +166,7 @@ def main():
 
     print("")
     Console.info("Console log available at: " + str(p))
-    Console.info("Data log available at: " + str(controller.datalog.log_file))
+    #Console.info("Data log available at: " + str(controller.datalog.log_file))
     
     
 
