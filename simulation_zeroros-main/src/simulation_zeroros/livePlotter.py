@@ -144,7 +144,7 @@ class GidGraphDisplay( PlotDisplay ):
     def __init__(this, xPosition, yPosition, width, height, parentWindow,  xMax,   yMax, xLabel="", yLabel="", title=""): 
         super().__init__( xPosition, yPosition, width, height, parentWindow )  
          
-        this.gData = np.random.random( (xMax, yMax) )
+        this.gData = np.random.random( (xMax, yMax) )*1.2-0.2
         
         this.xMax = xMax
         this.yMax = yMax
@@ -155,7 +155,7 @@ class GidGraphDisplay( PlotDisplay ):
         this.subAxis.set_ylim( 0, yMax )
         
     def randomData(this): 
-        this.parseData( np.random.random( (this.width, this.height) ) )
+        this.parseData( np.random.random( (this.width, this.height) )*2-1 )
         
     def parseData(this, nData):
         super().parseData() 

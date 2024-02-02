@@ -6,6 +6,7 @@ from ProbabilityGrid import ProbabiltyGrid
 import simpleicp as sicp
 from scipy.signal import convolve2d
  
+import open3d
 
 globalLoggs = []
 
@@ -332,7 +333,7 @@ class GridMapper:
         this.allMeanPLMs = []
        
         
-    def pushScanCloud( this, newPC:PointCloud, autoMerge=True, hitMod=0.2, missMod=-0.2 ): 
+    def pushScanCloud( this, newPC:PointCloud, autoMerge=True, hitMod=0.5, missMod=-0.2 ): 
         this.lastScanCloud = newPC
         
         # Fetches the pose, then adds lines corresponding to
@@ -359,12 +360,20 @@ class GridMapper:
             meanPose.addPose( addedPLM.pose )
             meanGrid.gridData = meanGrid.gridData + addedPLM.mapGrid.gridData
             
-        meanGrid.gridData.clip(0, 1) 
+        meanGrid.gridData = meanGrid.gridData.clip(-0.2, 1) 
         meanPose.divide( len( this.bufferPLM ) ) # TODO potential bug from angle averaging
         
         this.allMeanPLMs.append( PoseLocalisedMap( meanPose, meanGrid ) )
         
         this.bufferPLM = newBuffer
+        
+        this.ICPthing()
+        
+    # Performs an adjustment using ICP to improve the pose of consecutive PLMs
+    def ICPthing(this):
+        if ( len(this.allMeanPLMs) < 2 ):
+            return 
+         
     
     def pointCloudAsGridpoints(this, pointCloud:PointCloud):
         xPoints = ((np.array( pointCloud.pointXs ) - this.xMin)*this.mapGrid.cellRes).astype(int)

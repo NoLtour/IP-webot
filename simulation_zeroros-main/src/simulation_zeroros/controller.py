@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 from pathlib import Path
 
+from scipy.signal import convolve2d
 from zeroros import Subscriber, Publisher
 from zeroros.messages import LaserScan, Twist, Odometry, Vector3
 from zeroros.datalogger import DataLogger
@@ -83,6 +84,8 @@ class RobotController:
         lpRoboDisplay.parseData( this.navigator.posTracker.worldPose, [this.gridMapper.lastScanCloud.pointXs, this.gridMapper.lastScanCloud.pointYs] ) 
         if ( len(this.gridMapper.allMeanPLMs) != 0 ):
             gridDisp.parseData( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData )
+            
+            gridDisp2.parseData( convolve2d( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData,  np.array([[0.08,0.12,0.08],[0.12,0.2,0.12],[0.08,0.12,0.08]]), mode="same" ) )
         
         #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )
          
@@ -90,8 +93,7 @@ class RobotController:
         #pointCloudIG = np.array( [xPoints, yPoints, np.zeros(yPoints.shape)] ) 
         
         #this.gridMapper.simpleICPSolve( foundInterceptGrid, pointCloudNP )
-        
-        #gridDisp2.parseData( foundInterceptGrid )
+         
         lpWindow.render()
         
         this.setWheelVelocity( lVel, rVel )
