@@ -33,6 +33,17 @@ gridDisp2     = lp.GidGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP
  
 _start_millis = -1
 
+def gaussian_kernel(size, sigma=1):
+    """Generates a Gaussian kernel."""
+    kernel = np.fromfunction(
+        lambda x, y: (1/(2*np.pi*sigma**2)) * np.exp(-((x-(size-1)/2)**2 + (y-(size-1)/2)**2)/(2*sigma**2)),
+        (size, size)
+    )
+    return kernel / np.sum(kernel)
+
+ 
+G_Kernal5 = gaussian_kernel( 5, 2 )
+
 def millis():
     """millis since first robot controller initialisation started"""
     return (round(time.time() * 1000)) - _start_millis
@@ -85,7 +96,7 @@ class RobotController:
         if ( len(this.gridMapper.allMeanPLMs) != 0 ):
             gridDisp.parseData( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData )
             
-            gridDisp2.parseData( convolve2d( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData,  np.array([[0.08,0.12,0.08],[0.12,0.2,0.12],[0.08,0.12,0.08]]), mode="same" ) )
+            gridDisp2.parseData( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData-convolve2d( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData,  G_Kernal5, mode="same" ) )
         
         #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )
          
