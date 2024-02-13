@@ -4,6 +4,8 @@ simulationViewPerspectives: 000000ff0000000100000002000001de0000040d010000000201
 sceneTreePerspectives: 000000ff00000001000000030000001e000001e7000001020100000002010000000201
 maximizedDockId: -1
 centralWidgetVisible: 1
+projectionMode: PERSPECTIVE
+renderingMode: WIREFRAME
 orthographicViewHeight: 1
 textFiles: 0 "controllers/webots_controller/webots_controller.py"
 globalOptionalRendering: LidarPointClouds::LidarRaysPaths::ContactPoints
