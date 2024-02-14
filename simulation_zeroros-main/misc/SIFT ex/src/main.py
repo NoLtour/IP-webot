@@ -240,7 +240,7 @@ class SIFT_thing:
 
 # Load the image using PIL (Python Imaging Library) 
 image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-05_16.20.47.png'
-image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-02_16.54.43.png'
+image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\CaptureCC.png'
 #image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-02_16.56.42.png'
  
 img = Image.open(image_path)
@@ -274,7 +274,7 @@ def circlePlot( ax, points, size ):
 
 def otherTest():
     ST = SIFT_thing()
-    img_array2 = ST.downSample( img_array, 1 )
+    img_array2 = ST.downSample( img_array, 4.5 )
 
     
     fig, ax = plt.subplots()
@@ -283,9 +283,9 @@ def otherTest():
     plt.imshow( img_array2 ) 
     features = ST.extractFeatures( img_array2 )
     
-    #circlePlot( ax, features[0], 20 )
-    #circlePlot( ax, features[1], 8 )
-    #circlePlot( ax, features[2], 16 )
+    #circlePlot( ax, features[0], 4 )
+    circlePlot( ax, features[1], 8 )
+    circlePlot( ax, features[2], 16 )
     circlePlot( ax, features[3], 32 )
     circlePlot( ax, features[4], 64 )
     
