@@ -16,7 +16,7 @@ class Mapper:
     
     gridResolution: float
     
-    def __init__(this, navigator:Navigator, gridResolution=80):
+    def __init__(this, navigator:Navigator, gridResolution=40):
         this.navigator = navigator
         this.allScans  = []
         this.scanBuffer = []

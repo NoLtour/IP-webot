@@ -29,16 +29,16 @@ def gaussian_kernel(size, sigma=1):
     )
     return kernel / np.sum(kernel)
 
-def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(6, 3)  ): 
+def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(9, 4)  ): 
      
     nonZeroMask = np.abs(inpArray) > 0.05
     wallArray   = inpArray * (inpArray > 0)
 
     Iy, Ix = np.gradient( wallArray ) 
      
-    IxIx = convolve2d( np.square( Ix ), kernal, mode="same" ) * nonZeroMask
-    IxIy =  convolve2d( 2 * Ix * Iy , kernal, mode="same" )   * nonZeroMask
-    IyIy =  convolve2d(np.square( Iy ) , kernal, mode="same" )* nonZeroMask
+    IxIx = convolve2d( np.square( Ix ), kernal, mode="same" ) 
+    IxIy =  convolve2d( 2 * Ix * Iy , kernal, mode="same" )   
+    IyIy =  convolve2d(np.square( Iy ) , kernal, mode="same" )
       
     #return eigvals( np.stack((IxIx, IxIy, IxIy, IyIy), axis=-1).reshape((*IxIx.shape, 2, 2)) )
     #return eigvals(np.array([[IxIx, IxIy], [IxIy, IyIy]]))
@@ -47,13 +47,11 @@ def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(6, 3)  ):
     sqBAC = np.sqrt( np.square(IxIy) + np.square( IxIx - IyIy ) )
     
     lambda_1 = 0.5 * ( ApC + sqBAC )
-    lambda_2 = 0.5 * ( ApC - sqBAC )
-
-    return lambda_1
+    lambda_2 = 0.5 * ( ApC - sqBAC ) 
     
-    #Rval = lambda_1 * lambda_2 - k*np.square( lambda_1 + lambda_2 )
+    Rval = lambda_1 * lambda_2 - 0.05*np.square( lambda_1 + lambda_2 ) 
     
-    return lambda_1, lambda_2
+    return lambda_1, lambda_2, Rval
 
 class MAP_PROP:
     X_MIN = -4
@@ -136,10 +134,14 @@ class RobotController:
         
         lpRoboDisplay.parseData( this.navigator.currentPose, this.realPose, [[0],[0]] ) 
         if ( len(this.mapper.allScans) != 0 ):
-            gridDisp.parseData( this.mapper.allScans[-1].gridData )
+            #gridDisp.parseData( this.mapper.allScans[-1].gridData )
 
-            val = laplace( this.mapper.allScans[-1].gridData )
-            gridDisp2.parseData( val )
+            l1, l2, rv = guassianCornerDist( this.mapper.allScans[-1].gridData )
+
+
+
+            gridDisp.parseData( this.mapper.allScans[-1].gridData )
+            gridDisp2.parseData( rv/np.max(rv) )
             #gridDisp2.parseData( this.mapper.allScans[-1].gridData )
         
         #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )

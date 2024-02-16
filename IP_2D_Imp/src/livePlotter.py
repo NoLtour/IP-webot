@@ -177,7 +177,7 @@ class GidGraphDisplay( PlotDisplay ):
         this.xMax = xMax
         this.yMax = yMax
         
-        this.gridGraph = this.subAxis.imshow(this.gData, cmap='gray', interpolation='none', origin='lower', extent=[0, xMax, 0, yMax])
+        this.gridGraph = this.subAxis.imshow(this.gData, interpolation='none', origin='lower', extent=[0, xMax, 0, yMax])
         
         this.subAxis.set_xlim( 0, xMax )
         this.subAxis.set_ylim( 0, yMax )
