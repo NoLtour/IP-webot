@@ -41,6 +41,18 @@ class ProbabiltyGrid:
     yMax:int
     cellRes:float
     
+    @staticmethod 
+    def initFromLinecasts( cellRes:float, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, terminatorWeight:float, interceptWeight:float, disableClip=False ):
+        minX = np.min( lineTerminalX )
+        maxX = np.max( lineTerminalX )
+        minY = np.min( lineTerminalY )
+        maxY = np.max( lineTerminalY )
+        
+        nProbGrid = ProbabiltyGrid( minX, maxX, minY, maxY, cellRes )
+        nProbGrid.addLines( originX, originY, lineTerminalX, lineTerminalY, terminatorWeight, interceptWeight, disableClip )
+        
+        return nProbGrid
+    
     def __init__(this, xMin:int, xMax:int, yMin:int, yMax:int, cellRes:float):
         this.xMin = xMin
         this.xMax = xMax
@@ -59,11 +71,11 @@ class ProbabiltyGrid:
     def randomise(this):
         this.gridData = np.random.random( (this.width, this.height) )
     
-    def addLines(this, originX: float, originY: float, lineTerminalX: list[float], lineTerminalY: list[float], terminatorWeight:float, interceptWeight:float, disableClip=False ):
+    def addLines(this, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, terminatorWeight:float, interceptWeight:float, disableClip=False ):
         originXCell = int((originX- this.xMin)*this.cellRes)
         originYCell = int((originY - this.yMin)*this.cellRes)
         
-        for i in range( 0, len(lineTerminalX) ):
+        for i in range( 0, (lineTerminalX.size) ):
             termXCell = int((lineTerminalX[i]- this.xMin)*this.cellRes)
             termYCell = int((lineTerminalY[i] - this.yMin)*this.cellRes)
             

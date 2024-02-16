@@ -283,7 +283,7 @@ def otherTest():
     plt.imshow( img_array2 ) 
     features = ST.extractFeatures( img_array2 )
     
-    #circlePlot( ax, features[0], 4 )
+    circlePlot( ax, features[0], 4 )
     circlePlot( ax, features[1], 8 )
     circlePlot( ax, features[2], 16 )
     circlePlot( ax, features[3], 32 )

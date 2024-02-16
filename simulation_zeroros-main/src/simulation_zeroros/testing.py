@@ -338,8 +338,9 @@ class GridMapper:
         
         # Fetches the pose, then adds lines corresponding to
         cachedPose = this.posTracker.worldPose.copy()
-        newPG =  ProbabiltyGrid( this.xMin, this.xMax, this.yMin, this.yMax, this.cellRes )
-        newPG.addLines( cachedPose.x, cachedPose.y, newPC.pointXs, newPC.pointYs, hitMod, missMod, True ) 
+        #newPG =  ProbabiltyGrid( this.xMin, this.xMax, this.yMin, this.yMax, this.cellRes )
+        #newPG.addLines( cachedPose.x, cachedPose.y, newPC.pointXs, newPC.pointYs, hitMod, missMod, True ) 
+        newPG = ProbabiltyGrid.initFromLinecasts( this.cellRes, cachedPose.x, cachedPose.y, np.array(newPC.pointXs), np.array(newPC.pointYs), hitMod, missMod, True )
         newPLM = PoseLocalisedMap( cachedPose, newPG )
         
         this.bufferPLM.append( newPLM )
