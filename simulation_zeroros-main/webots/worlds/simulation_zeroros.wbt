@@ -30,10 +30,11 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.005398042650515628 0.9999705508825947 0.005455135479832842 1.5608286177774473
-  position 0.8004387384345628 1.3217079544280272 11.20173819218324
+  position 0.7991353949552814 1.3216935101988379 11.332113061398669
   follow "MyBot"
 }
 TexturedBackground {
+  skybox FALSE
 }
 TexturedBackgroundLight {
 }
@@ -60,36 +61,6 @@ DEF PINK_OBJECT3 Solid {
     }
   ]
   name "pink object 3"
-  boundingObject DEF PCYL Shape {
-    appearance PBRAppearance {
-      baseColor 1 0.1 0.3
-      roughness 0.16827074099999995
-      metalness 0
-    }
-    geometry DEF PCYL Cylinder {
-      height 0.8
-      radius 0.15
-      subdivision 20
-    }
-  }
-}
-DEF PINK_OBJECT3 Solid {
-  translation 0 -2 0.39
-  children [
-    DEF CYLINDER_SHAPE Shape {
-      appearance PBRAppearance {
-        baseColor 1 0.1 0.3
-        roughness 0.16827074099999995
-        metalness 0
-      }
-      geometry Cylinder {
-        height 0.8
-        radius 0.15
-        subdivision 20
-      }
-    }
-  ]
-  name "pink object 3(2)"
   boundingObject DEF PCYL Shape {
     appearance PBRAppearance {
       baseColor 1 0.1 0.3
@@ -151,6 +122,41 @@ DEF PINK_OBJECT3 Solid {
   boundingObject USE PBOX
 }
 DEF PINK_OBJECT3 Solid {
+  translation 0 -2 0.39
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry DEF PBOX Box {
+        size 0.1 0.3 0.8
+      }
+    }
+  ]
+  name "pink object 3(5)"
+  boundingObject USE PBOX
+}
+DEF PINK_OBJECT3 Solid {
+  translation 7.34641e-06 -2 0.39
+  rotation 0 0 1 1.5708
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry DEF PBOX Box {
+        size 0.1 0.3 0.8
+      }
+    }
+  ]
+  name "pink object 3(8)"
+  boundingObject USE PBOX
+}
+DEF PINK_OBJECT3 Solid {
   translation 0 0 0.39
   children [
     DEF CYLINDER_SHAPE Shape {
@@ -164,7 +170,7 @@ DEF PINK_OBJECT3 Solid {
       }
     }
   ]
-  name "pink object 3(5)"
+  name "pink object 3(2)"
   boundingObject USE PBOX
 }
 DEF PINK_OBJECT3 Solid {
@@ -258,7 +264,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF ROBOT Robot {
-  translation 1.00446 1.01208 0.0059598
+  translation 1.00428 1.01208 0.0059598
   rotation 0 0 1 -1.5660653071795858
   children [
     Gyro {
@@ -301,8 +307,8 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999998677 0.075
-        rotation 0.6492952158314753 -0.6492953991282636 0.3960192007582795 3.8957326918827695
+        translation 0 0.13499999999998466 0.075
+        rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
             rotation 0.577656895078166 0.5771968951617173 -0.5771968951617173 -2.093935
@@ -348,8 +354,8 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 -0.13499999999999734 0.075
-        rotation 0.6846198636849931 -0.6846198015442218 -0.25018267242455455 2.6512915227699567
+        translation 0 -0.13499999999999668 0.075
+        rotation 0.6846198636849928 -0.684619801544222 -0.25018267242455466 2.6512915227699576
         children [
           USE WHEEL
         ]

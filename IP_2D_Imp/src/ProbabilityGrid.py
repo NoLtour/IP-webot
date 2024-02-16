@@ -2,6 +2,9 @@
 import numpy as np
 from dataclasses import dataclass, field
 from Navigator import CartesianPose
+from scipy.signal import convolve2d
+
+from skimage.draw import polygon2mask, line
 
 def draw_line(mat, x0, y0, x1, y1, termVal, lineVal ):
     if not (0 <= x0 < mat.shape[1] and 0 <= x1 < mat.shape[1] and
@@ -91,11 +94,12 @@ class ProbabilityGrid:
     
     @staticmethod 
     def initFromScanFrames( cellRes:float, scanStack:list[ScanFrame], terminatorWeight:float, interceptWeight:float, maxScanDistance:float ):
-        
         xMin = 10000000000
         xMax = -10000000000
         yMin = 10000000000
         yMax = -10000000000
+
+        middleScan = scanStack[int( len(scanStack)/2 )]
         
         for targScan in scanStack:
             targScan.calculateTerminations( maxScanDistance )
@@ -105,15 +109,69 @@ class ProbabilityGrid:
             yMin = min( targScan.pose.y, yMin, np.min( targScan.calculatedTerminations[1] ) )
         
         finalGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
+        #seps = []
         for targScan in scanStack:
             nProbGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
             nProbGrid.addLines( targScan.pose.x, targScan.pose.y, 
                                targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations, 
                                terminatorWeight, interceptWeight )
             
+            midPointSeperation = np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
             
-            finalGrid.gridData += nProbGrid.gridData
+            if ( midPointSeperation != 0 ):
+                # TODO implement proper uncertainty model!
+                sigma = midPointSeperation*cellRes*3
+                
+                finalGrid.gridData += convolve2d( nProbGrid.gridData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
+            else:
+                finalGrid.gridData += nProbGrid.gridData
+        
+        finalGrid.gridData /= len(scanStack)
+        #print(seps)
+        
+        finalGrid.clipData()
+                
+        return finalGrid
+    
+    
+    @staticmethod 
+    def initFromScanFramesPoly( cellRes:float, scanStack:list[ScanFrame], terminatorWeight:float, interceptWeight:float, maxScanDistance:float ):
+        """Connects nearby points in the point cloud as straight lines"""
+        
+        xMin = 10000000000
+        xMax = -10000000000
+        yMin = 10000000000
+        yMax = -10000000000
+
+        middleScan = scanStack[int( len(scanStack)/2 )]
+        
+        for targScan in scanStack:
+            targScan.calculateTerminations( maxScanDistance )
+            xMax = max( targScan.pose.x, xMax, np.max( targScan.calculatedTerminations[0] ) )
+            xMin = min( targScan.pose.x, xMin, np.min( targScan.calculatedTerminations[0] ) )
+            yMax = max( targScan.pose.y, yMax, np.max( targScan.calculatedTerminations[1] ) )
+            yMin = min( targScan.pose.y, yMin, np.min( targScan.calculatedTerminations[1] ) )
+        
+        finalGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
+        #seps = []
+        for targScan in scanStack:
+            nProbGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
+            nProbGrid.addPolyLines( targScan.pose.x, targScan.pose.y, 
+                               targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations, 
+                               terminatorWeight, interceptWeight )
             
+            midPointSeperation = np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
+            
+            if (  midPointSeperation != 0 ):
+                # TODO implement proper uncertainty model!
+                sigma = midPointSeperation*cellRes*3
+                
+                finalGrid.gridData += convolve2d( nProbGrid.gridData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
+            else:
+                finalGrid.gridData += nProbGrid.gridData
+        
+        finalGrid.gridData /= len(scanStack)
+        #print(seps)
         
         finalGrid.clipData()
                 
@@ -151,6 +209,31 @@ class ProbabilityGrid:
             draw_line( this.gridData, originXCell, originYCell, termXCell, termYCell, 
                       interceptWeight if isInf[i] else terminatorWeight, 
                       interceptWeight )
+    
+    def addPolyLines(this, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, isInf:np.ndarray, terminatorWeight:float, interceptWeight:float, maxSep=0.1 ):
+        # Get them into integer pixel coordinates
+        originXCell = int((originX- this.xMin)*this.cellRes)
+        originYCell = int((originY - this.yMin)*this.cellRes)
+        termXCell = ((lineTerminalX- this.xMin)*this.cellRes).astype(int)
+        termYCell = ((lineTerminalY - this.yMin)*this.cellRes).astype(int)
+        
+        scanPoints = np.array([termYCell, termXCell]).transpose()
+
+        polyPoints = np.append( np.array([[originYCell, originXCell]]), scanPoints, axis=0 )
+
+        newGridData = interceptWeight * polygon2mask( this.gridData.shape, polyPoints )
+        
+        lastPoint = scanPoints[0] 
+        for point in scanPoints[1:]:
+            # Check if points are above a certain seperation 
+            if ( maxSep*this.cellRes < np.sqrt( np.square(lastPoint[0]-point[0]) + np.square(lastPoint[1]-point[1]) ) ):
+                newGridData[lastPoint[0],lastPoint[1]] = terminatorWeight
+            else:
+                newGridData[ line( point[0], point[1], lastPoint[0], lastPoint[1] ) ] = terminatorWeight
+ 
+            lastPoint = point
+
+        this.gridData += newGridData
         
     def debugLinecast(this, x0, y0, absAngle, length ):
         this.addLines(

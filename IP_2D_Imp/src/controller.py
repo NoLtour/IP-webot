@@ -9,6 +9,8 @@ from scipy.signal import convolve2d
 from zeroros import Subscriber, Publisher
 from zeroros.messages import LaserScan, Twist, Odometry, Vector3
 from zeroros.datalogger import DataLogger
+from scipy.signal import convolve2d
+from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 
 from simulation_zeroros.console import Console
 
@@ -18,6 +20,40 @@ import ProbabilityGrid
 
 import time 
 import livePlotter as lp
+
+def gaussian_kernel(size, sigma=1):
+    """Generates a Gaussian kernel."""
+    kernel = np.fromfunction(
+        lambda x, y: (1/(2*np.pi*sigma**2)) * np.exp(-((x-(size-1)/2)**2 + (y-(size-1)/2)**2)/(2*sigma**2)),
+        (size, size)
+    )
+    return kernel / np.sum(kernel)
+
+def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(6, 3)  ): 
+     
+    nonZeroMask = np.abs(inpArray) > 0.05
+    wallArray   = inpArray * (inpArray > 0)
+
+    Iy, Ix = np.gradient( wallArray ) 
+     
+    IxIx = convolve2d( np.square( Ix ), kernal, mode="same" ) * nonZeroMask
+    IxIy =  convolve2d( 2 * Ix * Iy , kernal, mode="same" )   * nonZeroMask
+    IyIy =  convolve2d(np.square( Iy ) , kernal, mode="same" )* nonZeroMask
+      
+    #return eigvals( np.stack((IxIx, IxIy, IxIy, IyIy), axis=-1).reshape((*IxIx.shape, 2, 2)) )
+    #return eigvals(np.array([[IxIx, IxIy], [IxIy, IyIy]]))
+    
+    ApC = IxIx + IyIy
+    sqBAC = np.sqrt( np.square(IxIy) + np.square( IxIx - IyIy ) )
+    
+    lambda_1 = 0.5 * ( ApC + sqBAC )
+    lambda_2 = 0.5 * ( ApC - sqBAC )
+
+    return lambda_1
+    
+    #Rval = lambda_1 * lambda_2 - k*np.square( lambda_1 + lambda_2 )
+    
+    return lambda_1, lambda_2
 
 class MAP_PROP:
     X_MIN = -4
@@ -101,8 +137,10 @@ class RobotController:
         lpRoboDisplay.parseData( this.navigator.currentPose, this.realPose, [[0],[0]] ) 
         if ( len(this.mapper.allScans) != 0 ):
             gridDisp.parseData( this.mapper.allScans[-1].gridData )
-            
-            #gridDisp2.parseData( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData-convolve2d( this.gridMapper.allMeanPLMs[-1].mapGrid.gridData,  G_Kernal5, mode="same" ) )
+
+            val = laplace( this.mapper.allScans[-1].gridData )
+            gridDisp2.parseData( val )
+            #gridDisp2.parseData( this.mapper.allScans[-1].gridData )
         
         #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )
          
@@ -130,7 +168,7 @@ class RobotController:
         leftRotation = msg.x
         rightRotation = msg.y 
         this.navigator.updatePosition( leftRotation, rightRotation )
-        print("updated positon: ", this.navigator.currentPose.x, this.navigator.currentPose.y, this.navigator.currentPose.yaw)
+        #print("updated positon: ", this.navigator.currentPose.x, this.navigator.currentPose.y, this.navigator.currentPose.yaw)
          
          
         

@@ -16,7 +16,7 @@ class Mapper:
     
     gridResolution: float
     
-    def __init__(this, navigator:Navigator, gridResolution=40):
+    def __init__(this, navigator:Navigator, gridResolution=80):
         this.navigator = navigator
         this.allScans  = []
         this.scanBuffer = []
@@ -33,7 +33,7 @@ class Mapper:
         
         # Under target conditions the scan buffer gets merged to make a new frame
         if ( len(this.scanBuffer) >= maxBuffer or ( len(this.scanBuffer) > 0 and acuteAngle( newScan.pose.yaw, this.scanBuffer[0].pose.yaw )  > maxAngleChange) ):
-            newProbGrid = ProbabilityGrid.initFromScanFrames( this.gridResolution, this.scanBuffer, 0.1, -0.1, 8 )
+            newProbGrid = ProbabilityGrid.initFromScanFramesPoly( this.gridResolution, this.scanBuffer, 1, -0.2, 8 )
             this.allScans.append( newProbGrid )
             
             this.scanBuffer = [ newScan ]
