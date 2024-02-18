@@ -17,41 +17,12 @@ from simulation_zeroros.console import Console
 from Navigator import Navigator, CartesianPose
 from Mapper import Mapper
 import ProbabilityGrid
+from ImageProcessor import ImageProcessor 
 
 import time 
 import livePlotter as lp
 
-def gaussian_kernel(size, sigma=1):
-    """Generates a Gaussian kernel."""
-    kernel = np.fromfunction(
-        lambda x, y: (1/(2*np.pi*sigma**2)) * np.exp(-((x-(size-1)/2)**2 + (y-(size-1)/2)**2)/(2*sigma**2)),
-        (size, size)
-    )
-    return kernel / np.sum(kernel)
-
-def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(9, 4)  ): 
-     
-    nonZeroMask = np.abs(inpArray) > 0.05
-    wallArray   = inpArray * (inpArray > 0)
-
-    Iy, Ix = np.gradient( wallArray ) 
-     
-    IxIx = convolve2d( np.square( Ix ), kernal, mode="same" ) 
-    IxIy =  convolve2d( 2 * Ix * Iy , kernal, mode="same" )   
-    IyIy =  convolve2d(np.square( Iy ) , kernal, mode="same" )
-      
-    #return eigvals( np.stack((IxIx, IxIy, IxIy, IyIy), axis=-1).reshape((*IxIx.shape, 2, 2)) )
-    #return eigvals(np.array([[IxIx, IxIy], [IxIy, IyIy]]))
-    
-    ApC = IxIx + IyIy
-    sqBAC = np.sqrt( np.square(IxIy) + np.square( IxIx - IyIy ) )
-    
-    lambda_1 = 0.5 * ( ApC + sqBAC )
-    lambda_2 = 0.5 * ( ApC - sqBAC ) 
-    
-    Rval = lambda_1 * lambda_2 - 0.05*np.square( lambda_1 + lambda_2 ) 
-    
-    return lambda_1, lambda_2, Rval
+ 
 
 class MAP_PROP:
     X_MIN = -4
@@ -64,8 +35,8 @@ class MAP_PROP:
 
 lpWindow = lp.PlotWindow(5, 15)
 lpRoboDisplay = lp.RobotDisplay(0,0,5,5,lpWindow, MAP_PROP.X_MIN, MAP_PROP.X_MAX, MAP_PROP.Y_MIN, MAP_PROP.Y_MAX)
-gridDisp      = lp.GidGraphDisplay(5,0,5,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
-gridDisp2     = lp.GidGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
+gridDisp      = lp.LabelledGridGraphDisplay(5,0,5,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
+gridDisp2     = lp.LabelledGridGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
  
 _start_millis = -1
 
@@ -124,6 +95,7 @@ class RobotController:
             print("KeyboardInterrupt received, stopping…")
         except Exception as e:
             print("Exception: ", e)
+            raise Exception( e )
         finally:
             this.laserscan_sub.stop()
 
@@ -136,13 +108,23 @@ class RobotController:
         if ( len(this.mapper.allScans) != 0 ):
             #gridDisp.parseData( this.mapper.allScans[-1].gridData )
 
-            l1, l2, rv = guassianCornerDist( this.mapper.allScans[-1].gridData )
+            #l1, l2, rv = guassianCornerDist( this.mapper.allScans[-1].gridData )
 
-
-
-            gridDisp.parseData( this.mapper.allScans[-1].gridData )
-            gridDisp2.parseData( rv/np.max(rv) )
-            #gridDisp2.parseData( this.mapper.allScans[-1].gridData )
+            scan = this.mapper.allScans[-1]
+            
+            if ( np.max( scan.positiveData ) != 0 ):
+                pMap = ImageProcessor.estimateFeatures( scan, 0.1 ) - scan.negativeData/2
+                
+                lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( pMap )
+                #rend = lambda_1/(lambda_2+0.00000000000001)
+                
+                maxPos, vals = ImageProcessor.findMaxima( Rval, 5 )
+                
+                gridDisp.parseData( pMap, maxPos[:,1], maxPos[:,0]  )
+                gridDisp2.parseData( Rval/np.max(Rval), maxPos[:,1], maxPos[:,0] )
+                #gridDisp2.parseData( this.mapper.allScans[-1].positiveData )
+            else:
+                gridDisp.parseData( scan.negativeData )
         
         #foundInterceptGrid, pointCloudNP = this.gridMapper.extractNearbyPoints( this.gridMapper.lastScanCloud, 0.3 )
          

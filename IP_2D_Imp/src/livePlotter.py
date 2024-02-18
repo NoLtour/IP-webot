@@ -169,18 +169,13 @@ class MultiLineGraphDisplay( PlotDisplay ):
 class GidGraphDisplay( PlotDisplay ):
     """Simple x-y plot, uses fixed axis"""
     
-    def __init__(this, xPosition, yPosition, width, height, parentWindow,  xMax,   yMax, xLabel="", yLabel="", title=""): 
+    def __init__(this, xPosition, yPosition, width, height, parentWindow,  xLabel="", yLabel="", title=""): 
         super().__init__( xPosition, yPosition, width, height, parentWindow )  
          
-        this.gData = np.random.random( (xMax, yMax) )*1.2-0.2
-        
-        this.xMax = xMax
-        this.yMax = yMax
-        
-        this.gridGraph = this.subAxis.imshow(this.gData, interpolation='none', origin='lower', extent=[0, xMax, 0, yMax])
-        
-        this.subAxis.set_xlim( 0, xMax )
-        this.subAxis.set_ylim( 0, yMax )
+        this.gData = np.random.random( (100, 100) )*1.2-0.2
+         
+        this.gridGraph = this.subAxis.imshow(this.gData, interpolation='none', origin='lower' ) 
+         
         
     def randomData(this): 
         this.parseData( np.random.random( (this.width, this.height) )*2-1 )
@@ -193,6 +188,30 @@ class GidGraphDisplay( PlotDisplay ):
         super().update()
         this.gridGraph.set_data( this.gData )
         this.subAxis.draw_artist( this.gridGraph )
+    
+class LabelledGridGraphDisplay( PlotDisplay ):
+    """Simple x-y plot, uses fixed axis"""
+    
+    def __init__(this, xPosition, yPosition, width, height, parentWindow,  xLabel="", yLabel="", title=""): 
+        super().__init__( xPosition, yPosition, width, height, parentWindow )  
+         
+        this.gData = np.random.random( (100, 100) )*1.2-0.2
+        this.lData = [[0, 10, 20], [0, 10, 5]]
+         
+        this.gridGraph = this.subAxis.imshow(this.gData, interpolation='none', origin='lower' )
+        this.labGraph, = this.subAxis.plot( [0, 10, 20], [0, 10, 5], "rx" )
+   
+    def parseData(this, nData:np.ndarray, xVals:np.ndarray=np.zeros((0)), yVals:np.ndarray=np.zeros((0)) ):
+        super().parseData() 
+        this.gData = nData
+        this.lData = [ xVals*100/nData.shape[1], yVals*100/nData.shape[0] ]
+        
+    def update(this):
+        super().update()
+        this.gridGraph.set_data( this.gData )
+        this.subAxis.draw_artist( this.gridGraph )
+        this.labGraph.set_data( this.lData[0], this.lData[1] )
+        this.subAxis.draw_artist( this.labGraph )
         
 
 

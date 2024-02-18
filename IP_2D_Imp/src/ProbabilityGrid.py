@@ -71,7 +71,10 @@ class ScanFrame:
 class ProbabilityGrid: 
     width: int
     height: int
-    gridData: np.ndarray
+    #gridData: np.ndarray
+    
+    negativeData: np.ndarray
+    positiveData: np.ndarray
     
     xMin:int
     xMax:int
@@ -94,6 +97,7 @@ class ProbabilityGrid:
     
     @staticmethod 
     def initFromScanFrames( cellRes:float, scanStack:list[ScanFrame], terminatorWeight:float, interceptWeight:float, maxScanDistance:float ):
+        eeeee
         xMin = 10000000000
         xMax = -10000000000
         yMin = 10000000000
@@ -157,8 +161,7 @@ class ProbabilityGrid:
         for targScan in scanStack:
             nProbGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
             nProbGrid.addPolyLines( targScan.pose.x, targScan.pose.y, 
-                               targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations, 
-                               terminatorWeight, interceptWeight )
+                               targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations  )
             
             midPointSeperation = np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
             
@@ -166,11 +169,14 @@ class ProbabilityGrid:
                 # TODO implement proper uncertainty model!
                 sigma = midPointSeperation*cellRes*3
                 
-                finalGrid.gridData += convolve2d( nProbGrid.gridData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
+                finalGrid.negativeData += convolve2d( nProbGrid.negativeData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
+                finalGrid.positiveData += convolve2d( nProbGrid.positiveData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
             else:
-                finalGrid.gridData += nProbGrid.gridData
+                finalGrid.negativeData += nProbGrid.negativeData
+                finalGrid.positiveData += nProbGrid.positiveData
         
-        finalGrid.gridData /= len(scanStack)
+        finalGrid.negativeData /= len(scanStack)
+        finalGrid.positiveData /= len(scanStack)
         #print(seps)
         
         finalGrid.clipData()
@@ -185,20 +191,25 @@ class ProbabilityGrid:
         this.cellRes = cellRes
         
         this.width = int((xMax - xMin)*cellRes)
-        this.height = int((yMax - yMin)*cellRes)
-        this.gridData = np.zeros( (this.height, this.width) )
+        this.height = int((yMax - yMin)*cellRes) 
+        
+        this.negativeData = np.zeros( (this.height, this.width) )
+        this.positiveData = np.zeros( (this.height, this.width) )
     
     # Returns the closest cell to the provided x and y coordinates
     def getCellAt( this, x:float, y:float ):
         return  int((x- this.xMin)*this.cellRes), int((y - this.yMin)*this.cellRes)  
     
     def randomise(this):
-        this.gridData = np.random.random( (this.width, this.height) )
+        this.negativeData = np.random.random( (this.width, this.height) )
+        this.positiveData = np.random.random( (this.width, this.height) )
         
     def clipData(this):
-        this.gridData = this.gridData.clip( -1, 1 )
+        this.negativeData = this.negativeData.clip( -1, 1 )
+        this.positiveData = this.positiveData.clip( -1, 1 )
     
     def addLines(this, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, isInf:np.ndarray, terminatorWeight:float, interceptWeight:float ):
+        eeee
         originXCell = int((originX- this.xMin)*this.cellRes)
         originYCell = int((originY - this.yMin)*this.cellRes)
         
@@ -206,11 +217,11 @@ class ProbabilityGrid:
             termXCell = int((lineTerminalX[i]- this.xMin)*this.cellRes)
             termYCell = int((lineTerminalY[i] - this.yMin)*this.cellRes)
             
-            draw_line( this.gridData, originXCell, originYCell, termXCell, termYCell, 
+            draw_line( this.positiveData, originXCell, originYCell, termXCell, termYCell, 
                       interceptWeight if isInf[i] else terminatorWeight, 
                       interceptWeight )
     
-    def addPolyLines(this, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, isInf:np.ndarray, terminatorWeight:float, interceptWeight:float, maxSep=0.1 ):
+    def addPolyLines(this, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, isInf:np.ndarray, maxSep=0.1 ):
         # Get them into integer pixel coordinates
         originXCell = int((originX- this.xMin)*this.cellRes)
         originYCell = int((originY - this.yMin)*this.cellRes)
@@ -221,26 +232,34 @@ class ProbabilityGrid:
 
         polyPoints = np.append( np.array([[originYCell, originXCell]]), scanPoints, axis=0 )
 
-        newGridData = interceptWeight * polygon2mask( this.gridData.shape, polyPoints )
+        observationRegion  = polygon2mask( this.negativeData.shape, polyPoints )
+        interceptionRegion = np.zeros( this.negativeData.shape  )
         
-        lastPoint = scanPoints[0] 
-        for point in scanPoints[1:]:
-            # Check if points are above a certain seperation 
-            if ( maxSep*this.cellRes < np.sqrt( np.square(lastPoint[0]-point[0]) + np.square(lastPoint[1]-point[1]) ) ):
-                newGridData[lastPoint[0],lastPoint[1]] = terminatorWeight
-            else:
-                newGridData[ line( point[0], point[1], lastPoint[0], lastPoint[1] ) ] = terminatorWeight
- 
-            lastPoint = point
+        # scanpoints with inf values filtered out 
+        realPoints = scanPoints[isInf==False]
+        
+        if ( realPoints.size != 0 ):
+            lastPoint = realPoints[0] 
+            for point in realPoints[1:]: 
+                # Check if points are above a certain seperation 
+                if ( maxSep*this.cellRes < np.sqrt( np.square(lastPoint[0]-point[0]) + np.square(lastPoint[1]-point[1]) ) ):
+                    interceptionRegion[lastPoint[0],lastPoint[1]] = 1
+                else:
+                    interceptionRegion[ line( point[0], point[1], lastPoint[0], lastPoint[1] ) ] = 1
 
-        this.gridData += newGridData
+                lastPoint = point
+                
+        
+        this.positiveData += interceptionRegion
+        #                    observation region masked by where objects don't exist
+        this.negativeData += observationRegion * (interceptionRegion==0)
         
     def debugLinecast(this, x0, y0, absAngle, length ):
         this.addLines(
             x0, y0, [x0 + length*np.cos(absAngle) ], [y0 + length*np.sin(absAngle) ], 0.1, 0.01
         )
-    
+    """
     def addValue(this, x, y, v): 
-        this.gridData[y, x] += v
+        this.gridData[y, x] += v"""
 
 
