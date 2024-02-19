@@ -16,7 +16,7 @@ from simulation_zeroros.console import Console
 
 from Navigator import Navigator, CartesianPose
 from Mapper import Mapper
-import ProbabilityGrid
+from ProbabilityGrid import exportScanFrames, importScanFrames
 from ImageProcessor import ImageProcessor 
 
 import time 
@@ -113,15 +113,17 @@ class RobotController:
             scan = this.mapper.allScans[-1]
             
             if ( np.max( scan.positiveData ) != 0 ):
-                pMap = ImageProcessor.estimateFeatures( scan, 0.1 ) - scan.negativeData/2
+                """pMap = ImageProcessor.estimateFeatures( scan, 0.2 ) - scan.negativeData/2
                 
                 lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( pMap )
                 #rend = lambda_1/(lambda_2+0.00000000000001)
                 
-                maxPos, vals = ImageProcessor.findMaxima( Rval, 5 )
+                maxPos, vals = ImageProcessor.findMaxima( Rval, 5 )"""
+
+                #if ( not this.navigator.hasTarget() ): exportScanFrames( this.mapper.allRawScans, "testRunData" ) 
                 
-                gridDisp.parseData( pMap, maxPos[:,1], maxPos[:,0]  )
-                gridDisp2.parseData( Rval/np.max(Rval), maxPos[:,1], maxPos[:,0] )
+                """gridDisp.parseData( pMap, maxPos[:,1], maxPos[:,0]  )
+                gridDisp2.parseData( Rval/np.max(Rval), maxPos[:,1], maxPos[:,0] )"""
                 #gridDisp2.parseData( this.mapper.allScans[-1].positiveData )
             else:
                 gridDisp.parseData( scan.negativeData )

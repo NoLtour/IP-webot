@@ -193,6 +193,9 @@ class Navigator:
         
         this.nextTarget()
     
+    def hasTarget(this):
+        return len(this.targetNodes) != 0
+
     def addTarget(this, x, y ):
         """ Adds a new target, only consider's target x and y since movement's constrained to 2D plane """
         this.targetNodes.append(

@@ -61,9 +61,9 @@ def guassianCornerDist( inpArray:np.ndarray, kernal=gaussian_kernel(7, 3)  ):
     lambda_1 = 0.5 * ( ApC + sqBAC )
     lambda_2 = 0.5 * ( ApC - sqBAC )
     
-    #Rval = lambda_1 * lambda_2 - k*np.square( lambda_1 + lambda_2 )
+    Rval = lambda_1 * lambda_2 - 0.05*np.square( lambda_1 + lambda_2 )
     
-    return lambda_1, lambda_2
+    return Rval, lambda_1, lambda_2
  
 def gcsImage( inpArray:np.ndarray, K=10, kernal=gaussian_kernel(7, 3) ):
     outputs = np.zeros( inpArray[:,:,0].shape )
@@ -239,8 +239,8 @@ class SIFT_thing:
         ], axis=-1 )
 
 # Load the image using PIL (Python Imaging Library) 
-image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-05_16.20.47.png'
-image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\CaptureCC.png'
+image_path = 'C:\\IP webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-05_16.20.47.png'
+image_path = 'C:\\IP webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\CaptureBB.png'
 #image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-02_16.56.42.png'
  
 img = Image.open(image_path)
@@ -364,7 +364,7 @@ def peaking2():
     return"""
     
     ST = SIFT_thing()
-    hMap = convolve2d( ST.downSample( img_array, 8 ).transpose()[0].transpose(), guassian, mode="same" ) 
+    hMap = convolve2d( ST.downSample( img_array, 2 ).transpose()[0].transpose(), guassian, mode="same" ) 
     yGrad, xGrad = np.gradient( hMap )  
 
     # Find local maxima using maximum_filter
@@ -427,7 +427,7 @@ plt.imshow(img_array.transpose()[2].transpose(), cmap='Blues')"""
 #plt.imshow(this.gData, cmap='gray', interpolation='none', origin='lower', extent=[0, xMax, 0, yMax])
 
 #corning()
-otherTest()
-#peaking2()
+#otherTest()
+peaking2()
 
 plt.show()

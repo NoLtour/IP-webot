@@ -204,7 +204,7 @@ class LabelledGridGraphDisplay( PlotDisplay ):
     def parseData(this, nData:np.ndarray, xVals:np.ndarray=np.zeros((0)), yVals:np.ndarray=np.zeros((0)) ):
         super().parseData() 
         this.gData = nData
-        this.lData = [ xVals*100/nData.shape[1], yVals*100/nData.shape[0] ]
+        this.lData = [ (xVals+0.5)*100/nData.shape[1]-0.5, (yVals+0.5)*100/nData.shape[0]-0.5 ]
         
     def update(this):
         super().update()

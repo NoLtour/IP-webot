@@ -55,19 +55,19 @@ class ImageProcessor:
         ""
 
     @staticmethod
-    def estimateFeatures( inpGrid:ProbabilityGrid, estimatedWidth, minCutoff=0.001 ):
+    def estimateFeatures( inpGrid:ProbabilityGrid, estimatedWidth, sharpnessMult=2.5 ):
         """ Uses a model of the environment to partially fill in missing data """
         pixelWidth = estimatedWidth*inpGrid.cellRes
         kern = ImageProcessor.gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
         kern /= np.max(kern)
         
-        oup = np.maximum(convolve2d( inpGrid.positiveData, kern, mode="same" ) - inpGrid.negativeData*pixelWidth*2.5, 0)
+        oup = np.maximum(convolve2d( inpGrid.positiveData, kern, mode="same" ) - inpGrid.negativeData*pixelWidth*sharpnessMult, 0)
         return np.minimum( oup/np.max(oup)+inpGrid.positiveData, 1 ) 
     
     @staticmethod
     def findMaxima( inpArray:np.ndarray, maskSize = 3, threshHold = -1 ):
         filterDims = (maskSize,)*inpArray.ndim
-        localMaximums = np.where( (inpArray == maximum_filter(inpArray, size=filterDims, mode='constant')) ) # | (inpArray == minimum_filter(inpArray, size=filterDims, mode='constant'))  
+        localMaximums = np.where( (inpArray == maximum_filter(inpArray, size=filterDims, mode='constant'))  ) #  | (inpArray == minimum_filter(inpArray, size=filterDims, mode='constant')) 
         localIntensities = inpArray[ localMaximums ]
     
         if ( threshHold == -1 ):

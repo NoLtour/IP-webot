@@ -3,6 +3,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from Navigator import CartesianPose
 from scipy.signal import convolve2d
+import jsonpickle
 
 from skimage.draw import polygon2mask, line
 
@@ -67,6 +68,22 @@ class ScanFrame:
     
         this.calculatedTerminations = np.array([xPoints, yPoints])
         this.calculatedInfTerminations = isInf
+
+
+def exportScanFrames( scanStack: list[ScanFrame], fileName:str ): 
+
+    rawExport = jsonpickle.encode( scanStack )
+    with open( fileName, "w" ) as targFile:
+        targFile.write( rawExport )
+        targFile.close()
+
+def importScanFrames( fileName:str ):
+    rawData = ""
+    with open( fileName, "r" ) as targFile:
+        rawData = targFile.read()
+        targFile.close() 
+
+    return jsonpickle.decode( rawData ) 
 
 class ProbabilityGrid: 
     width: int
