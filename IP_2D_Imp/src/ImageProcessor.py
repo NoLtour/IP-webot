@@ -55,7 +55,7 @@ class ImageProcessor:
         ""
 
     @staticmethod
-    def estimateFeatures( inpGrid:ProbabilityGrid, estimatedWidth, sharpnessMult=2.5 ):
+    def estimateFeatures( inpGrid:ProbabilityGrid, estimatedWidth:float, sharpnessMult=2.5 ):
         """ Uses a model of the environment to partially fill in missing data """
         pixelWidth = estimatedWidth*inpGrid.cellRes
         kern = ImageProcessor.gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
@@ -78,9 +78,59 @@ class ImageProcessor:
         return np.array(localMaximums).transpose()[ mask ], localIntensities[mask]
 
     @staticmethod
-    def extractIntrest( inpGrid:ProbabilityGrid  ):
-        """  """
+    def extractOrientations( inpArray:np.ndarray, pointXs:np.ndarray, pointYs:np.ndarray, radius:int, oRes=12 ):
+        """ Produces a histogram with the centre shifted to be inline with the exponentially weighted "centre of mass" """
+
+        # Fix ranges to fit
+        yMins = np.maximum( pointYs-radius, 0 )  
+        yMaxs = np.minimum( pointYs+radius, inpArray.shape[0]-1 )
+        xMins = np.maximum( pointXs-radius, 0 )  
+        xMaxs = np.minimum( pointXs+radius, inpArray.shape[1]-1 )
         
+        outputs = []
+        #guassian = gaussian_kernel2( radius*2 + 1 )
+        
+        angleArrange = np.arange( 0, oRes, 1 )*(2*np.pi/oRes)
+        
+        vectorX = np.cos( angleArrange )
+        vectorY = np.sin( angleArrange )
+        
+        # Iterates through each search window
+        for yMin, yMax, xMin, xMax, i in zip(yMins, yMaxs, xMins, xMaxs, range(0, xMins.size)):
+            if ( yMax-yMin > 2 and xMax-xMin > 2 ):
+
+                windDy, windDx = np.gradient( inpArray[ yMin:yMax, xMin:xMax ] )
+                
+                windDy = windDy.flatten()
+                windDx = windDx.flatten()
+                
+                gain = np.sqrt(np.square(windDx) + np.square(windDy))
+                
+                # extract angles within the specified window after normalising about the primary direction
+                angles = np.mod(np.arctan2( windDy, windDx ) + 2*np.pi, 2*np.pi)
+                
+                # extract occurances of angles after converting them into the specified resolution
+                #types, freqs = np.unique( (angles*oRes/(2*np.pi)).astype(int), return_index=True )
+                
+                nAngles = (angles*oRes/(2*np.pi)).astype(int)
+                
+                # insert the frequency of occurances into the output array adjusted by gain
+                angleDist = np.zeros( oRes )
+                np.add.at( angleDist, nAngles, gain )
+                
+                netX = np.sum( vectorX*(angleDist**2) )
+                netY = np.sum( vectorY*(angleDist**2) )
+                # Finds the square weighted average vectors angle
+                avrgAngle = np.arctan2( netY, netX )
+                #avrgAngle = np.sum(( angleDist==np.max(angleDist) ) * np.arctan2( vectorY, vectorX ))
+                
+                # Shifts the angle distribution array such that the average angle lies at index zero
+                angleDist = np.roll( angleDist, - int( avrgAngle*(oRes*0.5/np.pi) - 0.5) )
+                
+                outputs.append( angleDist )
+        
+        return np.array(outputs)
+ 
         
         
     

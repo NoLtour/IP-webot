@@ -12,13 +12,25 @@ from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 from simulation_zeroros.console import Console
 
 from Navigator import Navigator, CartesianPose
-from Mapper import Mapper
+
 from ProbabilityGrid import exportScanFrames, importScanFrames
 from ImageProcessor import ImageProcessor 
 
 from matplotlib import pyplot as plt 
 
+class Test:
 
+    x = 20
+    y = 30
+    z = None
+    f: float = None
 
-plt.imshow( ImageProcessor.gaussian_kernel(7, 2) )
-plt.show()
+    def __init__(this):
+        this.x = 21
+        this.y = None
+
+tmp = Test()
+ 
+
+"""plt.imshow( ImageProcessor.gaussian_kernel(7, 2) )
+plt.show()"""
