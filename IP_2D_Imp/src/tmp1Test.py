@@ -18,19 +18,21 @@ from ImageProcessor import ImageProcessor
 
 from matplotlib import pyplot as plt 
 
-class Test:
+import timeit
 
-    x = 20
-    y = 30
-    z = None
-    f: float = None
+l1 = 20
+l2 = 5
 
-    def __init__(this):
-        this.x = 21
-        this.y = None
+hV = np.random.random(l1)
 
-tmp = Test()
- 
+hV2 = np.mean( hV.reshape( -1, int(l1/l2) ), axis=-1 )
+
+plt.plot( hV )
+
+plt.figure(2)
+plt.plot( hV2 )
+
+plt.show()
 
 """plt.imshow( ImageProcessor.gaussian_kernel(7, 2) )
 plt.show()"""

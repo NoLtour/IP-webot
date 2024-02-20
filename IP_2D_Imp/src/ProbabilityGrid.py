@@ -141,7 +141,7 @@ class ProbabilityGrid:
             
             if ( midPointSeperation != 0 ):
                 # TODO implement proper uncertainty model!
-                sigma = midPointSeperation*cellRes*3
+                sigma = midPointSeperation*cellRes*1
                 
                 finalGrid.gridData += convolve2d( nProbGrid.gridData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
             else:

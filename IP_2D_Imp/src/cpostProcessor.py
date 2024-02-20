@@ -13,6 +13,7 @@ from ProbabilityGrid import exportScanFrames, importScanFrames
 from ImageProcessor import ImageProcessor 
 
 from time import sleep
+import json
 import livePlotter as lp
  
 class MAP_PROP:
@@ -62,6 +63,65 @@ mapper = Mapper( None, mConfig )
 
 prevScan = 0
 
+def matchingTest( frame1Index, frame2Index ):
+    def custom_serializer(obj):
+        if isinstance(obj, np.ndarray):
+            return "..."
+        # Add additional custom serialization logic if needed
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+    scan1 = mapper.allScans[frame1Index]
+    scan2 = mapper.allScans[frame2Index]
+
+    mapper.compareScans( scan1, scan2 )
+    
+    pointCol = ["rx", "bx", "gx", "yx", "mx", "cx", "wx", "ro", "bo", "go", "yo", "mo", "co", "ko", "wo", "r+", "b+", "g+", "y+", "m+", "c+", "k+", "w+"]
+    pointColMap = {}
+
+    scans = mapper.allScans[frame1Index:frame2Index]
+
+    scanGroups = []
+    allGroups = []
+
+    for i in range( 0, len(scans) ):
+        scanGroups.append( list(scans[i].featureDict.keys()) )
+        allGroups += ( scanGroups[-1] )
+
+    allGroups = list( set( allGroups ) )
+    numm = 0
+    for group in allGroups:
+        pointColMap[group] = pointCol[numm]
+        numm+=1
+
+
+    for i in range( 0, len(scans) ):  
+        tScan = scans[i]
+
+        plt.figure(21+i)
+        plt.xlim(0, 180)
+        plt.ylim(300, 120)
+        plt.imshow( tScan.estimatedMap, cmap='gray' )
+
+        for group in scanGroups[i]:
+            for feat, I in zip(tScan.featureDict[group], range(0, len(tScan.featureDict[group]))):
+                plt.plot( feat[0][1], feat[0][0], pointColMap[group], markersize=12 )
+
+    """plt.figure(21)
+    plt.imshow( scan1.estimatedMap )
+    plt.plot( scan1.featurePositions[:,1], scan1.featurePositions[:,0], "rx" )
+    
+    plt.figure(22)
+    plt.imshow( scan2.estimatedMap )
+    plt.plot( scan2.featurePositions[:,1], scan2.featurePositions[:,0], "rx" )"""
+
+    """print("scan 1")
+    print( json.dumps( scan1.featureDict, indent=3, default=custom_serializer ) )
+    print("scan 2")
+    print( json.dumps( scan2.featureDict, indent=3, default=custom_serializer ) )"""
+
+    plt.show()
+    ""
+
 for cRawScan in allScansRaw:
     mapper.pushScanFrame( cRawScan )
     
@@ -73,6 +133,9 @@ for cRawScan in allScansRaw:
             
             gridDisp.parseData( scan.estimatedMap, fPos[:,1], fPos[:,0]  )
             #gridDisp2.parseData( Rval*1000, maxPos[:,1], maxPos[:,0]  )
+            
+            if ( len(mapper.allScans) > 6 ):
+                matchingTest( 2, 6 )
 
             prevScan = scan
 

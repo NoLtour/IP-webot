@@ -33,6 +33,10 @@ class MapperConfig:
     DESCRIPTOR_RADIUS   = 5
     DESCRIPTOR_CHANNELS = 12
 
+    # Feature descriptor comparison
+    #DCOMP_COMPARISON_RADIUS = 2 # The permittable mismatch between the descriptors keychannels when initially comparing 2 descriptors
+    DCOMP_COMPARISON_COUNT     = 1 # The number of descriptor keychannels to used when initially comparing 2 descriptors 
+
 class ProcessedScan:
     rawScans: list[ScanFrame]
 
@@ -40,6 +44,9 @@ class ProcessedScan:
     estimatedMap: np.ndarray = None
     featurePositions : np.ndarray = None
     featureDescriptors: list[np.ndarray] = None
+
+    # Maps feature descriptors by key channels, structure: dict[channelHash] = [ [x, y], [channel data] ]
+    featureDict: dict[int, list[np.ndarray]] = None
 
     def __init__(this, inpScanFrames: list[ScanFrame]) -> None:
         this.rawScans = inpScanFrames
@@ -52,7 +59,7 @@ class ProcessedScan:
         this.estimatedMap = ImageProcessor.estimateFeatures( this.constructedProbGrid, estimatedWidth, sharpnessMult ) - this.constructedProbGrid.negativeData/2
     
     # TODO consider applying a guassian weighting to the features extracted, such that orientations are weighted higher near the centre
-    def extractFeatures( this, cornerKernal=ImageProcessor.gaussian_kernel(9, 4), maximaSearchRad=3, minMaxima=-1, featureRadius=4, descriptorChannels=12 ):
+    def extractFeatures( this, keychannelNumb, cornerKernal=ImageProcessor.gaussian_kernel(9, 4), maximaSearchRad=3, minMaxima=-1, featureRadius=4, descriptorChannels=12 ):
         """ Extracts the positions and descriptors of intrest points """
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.estimatedMap, cornerKernal )
         
@@ -60,7 +67,19 @@ class ProcessedScan:
  
         this.featureDescriptors = ImageProcessor.extractOrientations( this.estimatedMap, this.featurePositions[:,0], this.featurePositions[:,1], featureRadius, descriptorChannels )
 
+        this.featureDict = {}
 
+        for descriptor, position in zip(this.featureDescriptors, this.featurePositions):
+                # It gets the indecies of the largest descriptor channels for DCOMP_COMPARISON_COUNT channels
+                keypointIndecies = np.argpartition(descriptor, -keychannelNumb)[-keychannelNumb:]
+
+                # It uses these channels to create a key, then adds to the map
+                descriptorKey = hash(keypointIndecies.tobytes())
+
+                if descriptorKey in this.featureDict:
+                    this.featureDict[descriptorKey].append( [position, descriptor] )
+                else:
+                    this.featureDict[descriptorKey] = [ [position, descriptor] ]
 
 class Mapper:
     navigator: Navigator
@@ -87,12 +106,12 @@ class Mapper:
         
         if ( recentScan.featureDescriptors is None ):
             recentScan.estimateMap( this.config.GRID_RESOLUTION, this.config.IE_OBJECT_SIZE, this.config.IE_SHARPNESS )
-            recentScan.extractFeatures( this.config.CORN_DET_KERN, this.config.CORN_PEAK_SEARCH_RADIUS, this.config.CORN_PEAK_MIN_VALUE, this.config.DESCRIPTOR_RADIUS, this.config.DESCRIPTOR_CHANNELS )
+            recentScan.extractFeatures( this.config.DCOMP_COMPARISON_COUNT, this.config.CORN_DET_KERN, this.config.CORN_PEAK_SEARCH_RADIUS, this.config.CORN_PEAK_MIN_VALUE, this.config.DESCRIPTOR_RADIUS, this.config.DESCRIPTOR_CHANNELS )
 
             return recentScan
         return None
         
-        
+    
 
     def pushLidarScan( this, lidarOup ) -> None: 
         """ Pushed the scan frame onto the scan buffer and merges to make a completed image if conditions met """
@@ -113,7 +132,24 @@ class Mapper:
             this.scanBuffer = [ newScan ] 
         else:
             this.scanBuffer.append( newScan ) 
+    
+    def compareScans( this, scan1: ProcessedScan, scan2: ProcessedScan ):
+        
+        if ( len(scan1.featureDescriptors) == 0 or len(scan2.featureDescriptors) == 0 ):
+            raise RuntimeError( "scan has no features" )
+        
+        desciptorChannels = (scan1.featureDescriptors)[0].size
+        
+        
+        
+        ""
+
             
+
+
+
+
+
         
         
         
