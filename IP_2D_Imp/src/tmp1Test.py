@@ -19,20 +19,30 @@ from ImageProcessor import ImageProcessor
 from matplotlib import pyplot as plt 
 
 import timeit
+import numpy as np
 
-l1 = 20
-l2 = 5
+# Example arrays of vectors
+array1 = np.array([[1, 2], [3, 4]])  # Example array 1
+array2 = np.array([[5, 6], [7, 8], [9, 10]])  # Example array 2
 
-hV = np.random.random(l1)
+# Get the dimensions of the input arrays
+m, n = array1.shape
+p, q = array2.shape
 
-hV2 = np.mean( hV.reshape( -1, int(l1/l2) ), axis=-1 )
+# Create 2D arrays repeating the vectors along the x and y axes
+repeated_array1 = np.repeat(array1, p, axis=0)
+repeated_array2 = np.repeat(array2, n, axis=1)
 
-plt.plot( hV )
+# Sum the two arrays element-wise to get the final array containing all possible vector combinations
+final_array = repeated_array1 + repeated_array2
 
-plt.figure(2)
-plt.plot( hV2 )
-
-plt.show()
-
-"""plt.imshow( ImageProcessor.gaussian_kernel(7, 2) )
-plt.show()"""
+print("Array 1:")
+print(array1)
+print("\nArray 2:")
+print(array2)
+print("\nRepeated Array 1:")
+print(repeated_array1)
+print("\nRepeated Array 2:")
+print(repeated_array2)
+print("\nFinal Array:")
+print(final_array)
