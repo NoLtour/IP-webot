@@ -125,12 +125,11 @@ def matchingTest( frame1Index, frame2Index ):
 def matchingTest2( frame1Index, frame2Index ):
     scan1 = mapper.allScans[frame1Index]
     scan2 = mapper.allScans[frame2Index]
-
-    mapper.compareScans( scan1, scan2 )
+ 
     
     pointCol = ["rx", "bx", "gx", "yx", "mx", "cx", "wx", "ro", "bo", "go", "yo", "mo", "co", "ko", "wo", "r+", "b+", "g+", "y+", "m+", "c+", "k+", "w+"] 
 
-    scan1.featureDescriptors 
+    mapper.compareScans2( scan1, scan2 )
 
     plt.figure(21)
     plt.imshow( scan1.estimatedMap )

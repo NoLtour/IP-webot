@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from ImageProcessor import ImageProcessor
 from typing import Union
+import random
 
 def acuteAngle( a1, a2 ) -> float:
     """Returns the acute angle between a1 and a2 in radians"""
@@ -34,7 +35,7 @@ class MapperConfig:
     DESCRIPTOR_CHANNELS = 12
 
     # Feature descriptor comparison
-    #DCOMP_COMPARISON_RADIUS = 2 # The permittable mismatch between the descriptors keychannels when initially comparing 2 descriptors
+    #DCOMP_COMPARISON_RADIUS    = 1 # The permittable mismatch between the descriptors keychannels when initially comparing 2 descriptors
     DCOMP_COMPARISON_COUNT     = 1 # The number of descriptor keychannels to used when initially comparing 2 descriptors 
 
 class ProcessedScan:
@@ -43,7 +44,7 @@ class ProcessedScan:
     constructedProbGrid: ProbabilityGrid = None
     estimatedMap: np.ndarray = None
     featurePositions : np.ndarray = None
-    featureDescriptors: list[np.ndarray] = None
+    featureDescriptors: np.ndarray = None
 
     # Maps feature descriptors by key channels, structure: dict[channelHash] = [ [x, y], [channel data] ]
     featureDict: dict[int, list[np.ndarray]] = None
@@ -133,16 +134,75 @@ class Mapper:
         else:
             this.scanBuffer.append( newScan ) 
     
+    def compareScans2( this, scan1: ProcessedScan, scan2: ProcessedScan, RANSACattempts=5 ):  
+        matchingSet1 = [] 
+        matchingSet2 = []  
+
+        set1size = 0
+        set2size = 0
+
+        for scanKey in scan1.featureDict.keys():
+            if ( scanKey in scan2.featureDict ):
+                matchingSet1.append( scan1.featureDict[scanKey] )
+                matchingSet2.append( scan2.featureDict[scanKey] )
+
+                set1size += len(matchingSet1[-1])
+                set2size += len(matchingSet2[-1])
+
+        # Done for debugging purposes (repeatability)
+        random.seed( set1size*set2size + set1size )
+
+        # Ensures that set1 is the larger one
+        flipped = False
+        if ( set1size < set2size ):
+            set1size, set2size = set2size, set1size
+            matchingSet1, matchingSet2 = matchingSet2, matchingSet1
+            flipped = True
+
+        # No checks to prevent duplicate checks
+        for i in range(0, RANSACattempts):
+
+
+            point1SumIndex = int(random()*set1size)
+
+            sumSize    = 0
+            pointGroup = 0
+            while ( sumSize <= point1SumIndex ): 
+                sumSize    += len(matchingSet1[pointGroup])
+                pointGroup += 1
+            pointGroup -= 1
+
+            point1 = matchingSet1[pointGroup][point1SumIndex - sumSize]
+
+        
+
     def compareScans( this, scan1: ProcessedScan, scan2: ProcessedScan ):
         
         if ( len(scan1.featureDescriptors) == 0 or len(scan2.featureDescriptors) == 0 ):
-            raise RuntimeError( "scan has no features" )
+            return -1
+            #raise RuntimeError( "atleast one scan has no features" )
         
-        desciptorChannels = (scan1.featureDescriptors)[0].size
+        if ( scan1.featurePositions.size < scan2.featurePositions.size ):
+            scan2, scan1 = scan1, scan2
+ 
+        closestIndexes = []
+        closestValues  = []
+        for feat1, pos1 in zip( scan1.featureDescriptors, scan1.featurePositions  ):
+            
+            closestMatchIndex = -1
+            closestMatchValue = 999999999999
+
+            for feat2, pos2, I in zip( scan2.featureDescriptors, scan2.featurePositions, range( 0, scan2.featurePositions.size ) ):
+                difference = np.sum(np.abs(feat2-feat1))
+
+                if ( difference < closestMatchValue ):
+                    closestMatchValue = difference
+                    closestMatchIndex = I
+
+            closestIndexes.append( closestMatchIndex ) 
+            closestValues.append( closestMatchValue )       
         
-        
-        
-        ""
+        return 
 
             
 
