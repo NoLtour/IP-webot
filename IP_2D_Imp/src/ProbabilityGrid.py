@@ -173,10 +173,10 @@ class ProbabilityGrid:
             yMax = max( targScan.pose.y, yMax, np.max( targScan.calculatedTerminations[1] ) )
             yMin = min( targScan.pose.y, yMin, np.min( targScan.calculatedTerminations[1] ) )
         
-        finalGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
+        finalGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
         #seps = []
         for targScan in scanStack:
-            nProbGrid = ProbabilityGrid( xMin-0.5, xMax+0.5, yMin-0.5, yMax+0.5, cellRes )
+            nProbGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
             nProbGrid.addPolyLines( targScan.pose.x, targScan.pose.y, 
                                targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations  )
             
@@ -198,7 +198,7 @@ class ProbabilityGrid:
         
         finalGrid.clipData()
                 
-        return finalGrid
+        return finalGrid, middleScan
     
     def __init__(this, xMin:int, xMax:int, yMin:int, yMax:int, cellRes:float):
         this.xMin = xMin

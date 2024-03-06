@@ -5,8 +5,6 @@ from ProbabilityGrid import ProbabilityGrid
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 
- 
- 
 
 class ImageProcessor:
     

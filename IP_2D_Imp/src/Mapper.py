@@ -2,12 +2,15 @@
 
 import numpy as np
 from ProbabilityGrid import ProbabilityGrid, ScanFrame
-from Navigator import Navigator
+from Navigator import Navigator, CartesianPose
 from dataclasses import dataclass, field
 
 from ImageProcessor import ImageProcessor
+from scipy.ndimage import rotate
 from typing import Union
 import random
+
+from matplotlib import pyplot as plt 
 
 def acuteAngle( a1, a2 ) -> float:
     """Returns the acute angle between a1 and a2 in radians"""
@@ -45,6 +48,7 @@ class ProcessedScan:
     estimatedMap: np.ndarray = None
     featurePositions : np.ndarray = None
     featureDescriptors: np.ndarray = None
+    scanCentre: CartesianPose = None
 
     # Maps feature descriptors by key channels, structure: dict[channelHash] = [ [x, y], [channel data] ]
     featureDict: dict[int, list[np.ndarray]] = None
@@ -55,7 +59,9 @@ class ProcessedScan:
     #, clearExcessData:bool = False
     def estimateMap( this, gridResolution:float, estimatedWidth:float, sharpnessMult=2.5 ) -> None:
         """ This constructs a probability grid from the scan data then preforms additional processing to account for object infill """
-        this.constructedProbGrid = ProbabilityGrid.initFromScanFramesPoly( gridResolution, this.rawScans, 1, -0.2, 8 )
+        this.constructedProbGrid, midScan = ProbabilityGrid.initFromScanFramesPoly( gridResolution, this.rawScans, 1, -0.2, 8 )
+        this.scanCentre = midScan.pose.copy()
+        this.scanCentre.addPose( CartesianPose.fromPolar2D( this.constructedProbGrid.positiveData.shape[1]/2, this.scanCentre.yaw ) )
 
         this.estimatedMap = ImageProcessor.estimateFeatures( this.constructedProbGrid, estimatedWidth, sharpnessMult ) - this.constructedProbGrid.negativeData/2
     
@@ -171,10 +177,65 @@ class Mapper:
                 sumSize    += len(matchingSet1[pointGroup])
                 pointGroup += 1
             pointGroup -= 1
+    
+    def computeAllFeatureMatches( this, scan1: ProcessedScan, scan2: ProcessedScan, minMatch=-1 ):  
+        """ Naive approach """
+        matchScores   = []
+        matchIndecies = [] 
 
-            point1 = matchingSet1[pointGroup][point1SumIndex - sumSize]
+        for scan1Feature, ind1 in zip(scan1.featureDescriptors, range(0, scan1.featureDescriptors.shape[0])):
+            for scan2Feature, ind2 in zip(scan2.featureDescriptors, range(0, scan2.featureDescriptors.shape[0])):
+                matchScores.append( np.sum(np.abs(scan1Feature - scan2Feature )) )
+                matchIndecies.append( (ind1, ind2) )
+                
+
+        matchScores = np.array(matchScores)
+        matchIndecies = np.array(matchIndecies)
+
+        if ( minMatch == -1 ):
+            return matchScores, matchIndecies
+        
+        mask = matchScores > minMatch
+        return matchScores[mask], matchIndecies[mask]
+        
+    def determineImageMatchSuccess( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
+        """ Naive approach, translates the modScan and then compares it with the refrance scan """
+
+        # The centre of this image, after being translated according to specified values
+        # It also gets this into resolution refrence frame
+        newModCentre = modScan.scanCentre 
+        newModCentre.addPose( CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
+        newModCentre.upscale( modScan.constructedProbGrid.cellRes )
+        newModCentre.forceInt()
+
+        newRefCentre = refScan.scanCentre.copy()
+        newRefCentre.upscale( refScan.constructedProbGrid.cellRes )
+        newRefCentre.forceInt()
+        awdawdawd
+        # COORDINATE FRAMES ARE FUCKED! ENSURE that images are aligned iwht ROBOT POV!?? (NOT CURRENTLY!)
+        
+        newModEstimatedMap = rotate( modScan.estimatedMap, rotation )
+        newRefEstimatedMap = refScan.estimatedMap
+
+        nMEMHalfWidth  = int(newModEstimatedMap.shape[1]/2)
+        nREMHalfWidth  = int(newRefEstimatedMap.shape[1]/2)
+        nMEMHalfHeight = int(newModEstimatedMap.shape[0]/2)
+        nREMHalfHeight = int(newRefEstimatedMap.shape[0]/2)
+
+        # Get both maps to be the same dimensions by determining the window of both of them
+        minX = (max( newModCentre.x-nMEMHalfWidth, newRefCentre.x-nREMHalfWidth ))
+        maxX = (min( newModCentre.x+nMEMHalfWidth, newRefCentre.x+nREMHalfWidth ))
+        minY = (max( newModCentre.y-nMEMHalfHeight, newRefCentre.y-nREMHalfHeight ))
+        maxY = (min( newModCentre.y+nMEMHalfHeight, newRefCentre.y+nREMHalfHeight ))
 
         
+        plt.figure(12)
+        plt.imshow( newModEstimatedMap )
+
+        newModEstimatedMap = newModEstimatedMap[ minY-(newModCentre.y-nMEMHalfHeight):maxY-(newModCentre.y-nMEMHalfHeight), minX-(newModCentre.x-nMEMHalfWidth):maxX-(newModCentre.x-nMEMHalfWidth) ]
+        newRefEstimatedMap = newRefEstimatedMap[ minY-(newRefCentre.y-nREMHalfHeight):maxY-(newRefCentre.y-nREMHalfHeight), minX-(newRefCentre.x-nREMHalfWidth):maxX-(newRefCentre.x-nREMHalfWidth) ]
+
+        return newModEstimatedMap, newRefEstimatedMap
 
     def compareScans( this, scan1: ProcessedScan, scan2: ProcessedScan ):
         

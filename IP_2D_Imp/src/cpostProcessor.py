@@ -129,23 +129,31 @@ def matchingTest2( frame1Index, frame2Index ):
     
     pointCol = ["rx", "bx", "gx", "yx", "mx", "cx", "wx", "ro", "bo", "go", "yo", "mo", "co", "ko", "wo", "r+", "b+", "g+", "y+", "m+", "c+", "k+", "w+"] 
 
-    mapper.compareScans2( scan1, scan2 )
+    matchValues, matchIndecies = mapper.computeAllFeatureMatches( scan1, scan2, 3 )
 
-    plt.figure(21)
+    frameXChange = scan2.scanCentre.x - scan1.scanCentre.x
+    frameYChange = scan2.scanCentre.y - scan1.scanCentre.y
+    frameYawChange = scan2.scanCentre.yaw - scan1.scanCentre.yaw
+    nSc1, nSc2 =  mapper.determineImageMatchSuccess( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
+
+    """plt.figure(21)
+    plt.imshow( nSc1 ) 
+    
+    plt.figure(22)
+    plt.imshow( nSc2 ) 
+
+    plt.figure(23)
     plt.imshow( scan1.estimatedMap )
     plt.plot( scan1.featurePositions[:,1], scan1.featurePositions[:,0], "rx" )
     
-    plt.figure(22)
+    plt.figure(24)
     plt.imshow( scan2.estimatedMap )
-    plt.plot( scan2.featurePositions[:,1], scan2.featurePositions[:,0], "rx" )
+    plt.plot( scan2.featurePositions[:,1], scan2.featurePositions[:,0], "rx" )"""
 
-    """print("scan 1")
-    print( json.dumps( scan1.featureDict, indent=3, default=custom_serializer ) )
-    print("scan 2")
-    print( json.dumps( scan2.featureDict, indent=3, default=custom_serializer ) )"""
+    """plt.figure(23)
+    plt.plot( matchValues ) """
 
-    plt.show()
-    ""
+    plt.show() 
 
 for cRawScan in allScansRaw:
     mapper.pushScanFrame( cRawScan )
@@ -159,9 +167,10 @@ for cRawScan in allScansRaw:
             gridDisp.parseData( scan.estimatedMap, fPos[:,1], fPos[:,0]  )
             #gridDisp2.parseData( Rval*1000, maxPos[:,1], maxPos[:,0]  )
             
-            if ( len(mapper.allScans) > 6 ):
-                #matchingTest( 2, 6 )
-                matchingTest2( 2, 3 )
+            #if ( len(mapper.allScans) > 6 ): 
+            #    matchingTest2( 2, 3 )
+            if ( len(mapper.allScans) > 200 ): 
+                matchingTest2( 1, 19 )
 
             prevScan = scan
 

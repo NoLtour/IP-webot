@@ -96,6 +96,17 @@ class CartesianPose:
         this.roll /= value
         this.pitch /= value
         this.yaw /= value
+    
+    def upscale(this, scaleFactor ):
+        """Performs an upscale by scaleFactor, only effects position"""
+        this.x *= scaleFactor
+        this.y *= scaleFactor
+        this.z *= scaleFactor 
+
+    def forceInt(this):
+        this.x = int( this.x )
+        this.y = int( this.y )
+        this.z = int( this.z )
           
     def rotatePose(this, roll, pitch, yaw):
         """Rotates this pose using the inputs given"""
