@@ -5,8 +5,7 @@ from ProbabilityGrid import ProbabilityGrid, ScanFrame
 from Navigator import Navigator, CartesianPose
 from dataclasses import dataclass, field
 
-from ImageProcessor import ImageProcessor
-from scipy.ndimage import rotate
+from ImageProcessor import ImageProcessor 
 from typing import Union
 import random
 
@@ -48,20 +47,22 @@ class ProcessedScan:
     estimatedMap: np.ndarray = None
     featurePositions : np.ndarray = None
     featureDescriptors: np.ndarray = None
-    scanCentre: CartesianPose = None
+    scanPose: CartesianPose = None
+    
+    offsetPose: CartesianPose = None
 
     # Maps feature descriptors by key channels, structure: dict[channelHash] = [ [x, y], [channel data] ]
     featureDict: dict[int, list[np.ndarray]] = None
 
-    def __init__(this, inpScanFrames: list[ScanFrame]) -> None:
+    def __init__(this, inpScanFrames: list[ScanFrame], offsetPose:CartesianPose=CartesianPose.zero() ) -> None:
         this.rawScans = inpScanFrames
+        this.offsetPose = offsetPose
 
     #, clearExcessData:bool = False
     def estimateMap( this, gridResolution:float, estimatedWidth:float, sharpnessMult=2.5 ) -> None:
         """ This constructs a probability grid from the scan data then preforms additional processing to account for object infill """
-        this.constructedProbGrid, midScan = ProbabilityGrid.initFromScanFramesPoly( gridResolution, this.rawScans, 1, -0.2, 8 )
-        this.scanCentre = midScan.pose.copy()
-        this.scanCentre.addPose( CartesianPose.fromPolar2D( this.constructedProbGrid.positiveData.shape[1]/2, this.scanCentre.yaw ) )
+        this.constructedProbGrid, midScan = ProbabilityGrid.initFromScanFramesPoly( gridResolution, this.rawScans, 8, this.offsetPose )
+        this.scanPose = midScan.pose.copy() 
 
         this.estimatedMap = ImageProcessor.estimateFeatures( this.constructedProbGrid, estimatedWidth, sharpnessMult ) - this.constructedProbGrid.negativeData/2
     
@@ -198,10 +199,68 @@ class Mapper:
         mask = matchScores > minMatch
         return matchScores[mask], matchIndecies[mask]
         
+    def copyScanWithOffset( this, targetScan:ProcessedScan, offsetPose:CartesianPose ):
+        offsetScan = ProcessedScan( targetScan.rawScans, offsetPose )
+        
+        offsetScan.estimateMap( this.config.GRID_RESOLUTION, this.config.IE_OBJECT_SIZE, this.config.IE_SHARPNESS )
+         
+        return offsetScan
+        
+        
     def determineImageMatchSuccess( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
         """ Naive approach, translates the modScan and then compares it with the refrance scan """
-
-        # The centre of this image, after being translated according to specified values
+ 
+        transScan = this.copyScanWithOffset( modScan, CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
+         
+        # +-1 offsets done to discriminate error prone edges
+        xAMin = max(refScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.xAMin)+1
+        xAMax = min(refScan.constructedProbGrid.xAMax, transScan.constructedProbGrid.xAMax)-1
+        yAMin = max(refScan.constructedProbGrid.yAMin, transScan.constructedProbGrid.yAMin)+1
+        yAMax = min(refScan.constructedProbGrid.yAMax, transScan.constructedProbGrid.yAMax)-1
+        
+        # The overlap frames limits in grid cooridiantes (an integer scaled by resolution)
+        absLimits = np.array( [ [xAMin, yAMin], 
+                                [xAMax, yAMax] ] )
+        
+        # Translates overlap coordiantes to be in localised probability grid coordiantes
+        transLimits = (absLimits - np.array([transScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.yAMin])) 
+        refLimits   = (absLimits - np.array([refScan.constructedProbGrid.xAMin, refScan.constructedProbGrid.yAMin])) 
+        
+        # Extracts the region of intrest from both images
+        transWindow = transScan.estimatedMap.copy()[ transLimits[0][1]:transLimits[1][1], transLimits[0][0]:transLimits[1][0] ]
+        refWindow   = refScan.estimatedMap.copy()[ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
+        
+        mask = ((transWindow!=0) * (refWindow!=0))
+        transWindow *= mask
+        refWindow   *= mask
+        
+        mArea = np.sum(np.abs( transWindow ) + np.abs( refWindow ))
+        
+        errorWindow = (transWindow*refWindow)
+        errorWindow = np.minimum( errorWindow, 0 )
+        errorWindow *= np.abs(errorWindow)
+        
+        errorScore = -1000*np.sum(errorWindow)/mArea
+        
+        errorWindow = np.where( errorWindow==0, np.inf, errorWindow )
+        
+        plt.figure(21)
+        plt.imshow(  np.where( transWindow==0, np.inf, transWindow ), origin='lower' ) 
+        
+        plt.figure(22)
+        plt.imshow(  np.where( refWindow==0, np.inf, refWindow ), origin='lower' ) 
+        
+        
+        plt.figure(23)
+        plt.imshow(  transScan.estimatedMap, origin='lower' ) 
+        
+        plt.figure(24)
+        plt.imshow(  refScan.estimatedMap, origin='lower' ) 
+        
+        plt.figure(25)
+        plt.colorbar(plt.imshow(  errorWindow, origin='lower' )) 
+        
+        """# The centre of this image, after being translated according to specified values
         # It also gets this into resolution refrence frame
         newModCentre = modScan.scanCentre 
         newModCentre.addPose( CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
@@ -211,8 +270,7 @@ class Mapper:
         newRefCentre = refScan.scanCentre.copy()
         newRefCentre.upscale( refScan.constructedProbGrid.cellRes )
         newRefCentre.forceInt()
-        awdawdawd
-        # COORDINATE FRAMES ARE FUCKED! ENSURE that images are aligned iwht ROBOT POV!?? (NOT CURRENTLY!)
+        awdawdawd 
         
         newModEstimatedMap = rotate( modScan.estimatedMap, rotation )
         newRefEstimatedMap = refScan.estimatedMap
@@ -234,8 +292,8 @@ class Mapper:
 
         newModEstimatedMap = newModEstimatedMap[ minY-(newModCentre.y-nMEMHalfHeight):maxY-(newModCentre.y-nMEMHalfHeight), minX-(newModCentre.x-nMEMHalfWidth):maxX-(newModCentre.x-nMEMHalfWidth) ]
         newRefEstimatedMap = newRefEstimatedMap[ minY-(newRefCentre.y-nREMHalfHeight):maxY-(newRefCentre.y-nREMHalfHeight), minX-(newRefCentre.x-nREMHalfWidth):maxX-(newRefCentre.x-nREMHalfWidth) ]
-
-        return newModEstimatedMap, newRefEstimatedMap
+"""
+        return errorScore, mArea
 
     def compareScans( this, scan1: ProcessedScan, scan2: ProcessedScan ):
         

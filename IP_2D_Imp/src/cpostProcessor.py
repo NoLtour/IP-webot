@@ -131,16 +131,18 @@ def matchingTest2( frame1Index, frame2Index ):
 
     matchValues, matchIndecies = mapper.computeAllFeatureMatches( scan1, scan2, 3 )
 
-    frameXChange = scan2.scanCentre.x - scan1.scanCentre.x
-    frameYChange = scan2.scanCentre.y - scan1.scanCentre.y
-    frameYawChange = scan2.scanCentre.yaw - scan1.scanCentre.yaw
-    nSc1, nSc2 =  mapper.determineImageMatchSuccess( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
+    frameXChange = scan2.scanPose.x - scan1.scanPose.x
+    frameYChange = scan2.scanPose.y - scan1.scanPose.y
+    frameYawChange = scan2.scanPose.yaw - scan1.scanPose.yaw
+    errorScore, areaOverlap =  mapper.determineImageMatchSuccess( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
 
+    print( errorScore, areaOverlap )
+    
     """plt.figure(21)
-    plt.imshow( nSc1 ) 
+    plt.imshow( nSc1, origin='lower' ) 
     
     plt.figure(22)
-    plt.imshow( nSc2 ) 
+    plt.imshow( nSc2, origin='lower' ) 
 
     plt.figure(23)
     plt.imshow( scan1.estimatedMap )
@@ -169,8 +171,8 @@ for cRawScan in allScansRaw:
             
             #if ( len(mapper.allScans) > 6 ): 
             #    matchingTest2( 2, 3 )
-            if ( len(mapper.allScans) > 200 ): 
-                matchingTest2( 1, 19 )
+            if ( len(mapper.allScans) > 40 ): 
+                matchingTest2( 40, 38 )
 
             prevScan = scan
 

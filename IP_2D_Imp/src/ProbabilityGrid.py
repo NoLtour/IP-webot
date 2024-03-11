@@ -54,20 +54,24 @@ class ScanFrame:
     
     pose: CartesianPose = field(default_factory=lambda: CartesianPose.zero() )
 
-    calculatedTerminations: np.ndarray = field(default_factory=lambda: np.array([], dtype=float))
-    calculatedInfTerminations: np.ndarray = field(default_factory=lambda: np.array([], dtype=float))
+    #calculatedTerminations: np.ndarray = field(default_factory=lambda: np.array([], dtype=float))
+    #calculatedInfTerminations: np.ndarray = field(default_factory=lambda: np.array([], dtype=float))
 
-    def calculateTerminations( this, maxLength ):
+
+    def calculateTerminations( this, maxLength, refPose:CartesianPose ):
+        """ Calculates the points of termination for this scan frame, relative to some refreance pose which is used as the origin """
+        
         isInf = np.isinf( this.scanDistances )
         
         # A version of scan distances where values: inf -> maxLength
         adjustedDistances = np.where( isInf, maxLength, this.scanDistances )
         
-        xPoints = this.pose.x + adjustedDistances * np.cos( this.scanAngles + this.pose.yaw )
-        yPoints = this.pose.y + adjustedDistances * np.sin( this.scanAngles + this.pose.yaw )
+        xPoints = this.pose.x - refPose.x + adjustedDistances * np.cos( this.scanAngles + this.pose.yaw - refPose.yaw )
+        yPoints = this.pose.y - refPose.y + adjustedDistances * np.sin( this.scanAngles + this.pose.yaw - refPose.yaw )
     
         this.calculatedTerminations = np.array([xPoints, yPoints])
         this.calculatedInfTerminations = isInf
+    
 
 
 def exportScanFrames( scanStack: list[ScanFrame], fileName:str ): 
@@ -93,13 +97,18 @@ class ProbabilityGrid:
     negativeData: np.ndarray
     positiveData: np.ndarray
     
-    xMin:int
-    xMax:int
-    yMin:int
-    yMax:int
+    xMin:float
+    xMax:float
+    yMin:float
+    yMax:float
     cellRes:float
     
-    @staticmethod 
+    xAMin:int
+    xAMax:int
+    yAMin:int
+    yAMax:int
+    
+    """@staticmethod 
     def initFromLinecasts( cellRes:float, originX: float, originY: float, lineTerminalX: np.ndarray, lineTerminalY: np.ndarray, terminatorWeight:float, interceptWeight:float ):
         minX = np.min( lineTerminalX )
         maxX = np.max( lineTerminalX )
@@ -153,31 +162,38 @@ class ProbabilityGrid:
         finalGrid.clipData()
                 
         return finalGrid
-    
+    """
     
     @staticmethod 
-    def initFromScanFramesPoly( cellRes:float, scanStack:list[ScanFrame], terminatorWeight:float, interceptWeight:float, maxScanDistance:float ):
-        """Connects nearby points in the point cloud as straight lines"""
+    def initFromScanFramesPoly( cellRes:float, scanStack:list[ScanFrame], maxScanDistance:float, offsetPose:CartesianPose=CartesianPose.zero() ):
+        """
+            Constructs a scene by creating an image of negative space consisiting of area covered within linecasts, then constructs positive space
+            consisting of line segmants connecting nearby hits
+            The image's x and y coordinates are given about the centre frame (which acts as the origin), but this can be offset using the optional inputs
+        """
         
         xMin = 10000000000
         xMax = -10000000000
         yMin = 10000000000
         yMax = -10000000000
 
-        middleScan = scanStack[int( len(scanStack)/2 )]
+        middleScan = scanStack[int( len(scanStack)/2 )] 
+        
+        zeroPose = middleScan.pose.copy()
+        zeroPose.addPose( offsetPose )
         
         for targScan in scanStack:
-            targScan.calculateTerminations( maxScanDistance )
-            xMax = max( targScan.pose.x, xMax, np.max( targScan.calculatedTerminations[0] ) )
-            xMin = min( targScan.pose.x, xMin, np.min( targScan.calculatedTerminations[0] ) )
-            yMax = max( targScan.pose.y, yMax, np.max( targScan.calculatedTerminations[1] ) )
-            yMin = min( targScan.pose.y, yMin, np.min( targScan.calculatedTerminations[1] ) )
+            targScan.calculateTerminations( maxScanDistance, zeroPose )
+            xMax = max( targScan.pose.x - zeroPose.x, xMax, np.max( targScan.calculatedTerminations[0] ) )
+            xMin = min( targScan.pose.x - zeroPose.x, xMin, np.min( targScan.calculatedTerminations[0] ) )
+            yMax = max( targScan.pose.y - zeroPose.y, yMax, np.max( targScan.calculatedTerminations[1] ) )
+            yMin = min( targScan.pose.y - zeroPose.y, yMin, np.min( targScan.calculatedTerminations[1] ) )
         
         finalGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
         #seps = []
         for targScan in scanStack:
             nProbGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
-            nProbGrid.addPolyLines( targScan.pose.x, targScan.pose.y, 
+            nProbGrid.addPolyLines( targScan.pose.x - zeroPose.x, targScan.pose.y - zeroPose.y, 
                                targScan.calculatedTerminations[0], targScan.calculatedTerminations[1], targScan.calculatedInfTerminations  )
             
             midPointSeperation = np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
@@ -200,12 +216,17 @@ class ProbabilityGrid:
                 
         return finalGrid, middleScan
     
-    def __init__(this, xMin:int, xMax:int, yMin:int, yMax:int, cellRes:float):
+    def __init__(this, xMin:float, xMax:float, yMin:float, yMax:float, cellRes:float):
         this.xMin = xMin
         this.xMax = xMax
         this.yMin = yMin
         this.yMax = yMax
         this.cellRes = cellRes
+        
+        this.xAMin = int(xMin*cellRes)
+        this.xAMax = int(xMax*cellRes)
+        this.yAMin = int(yMin*cellRes)
+        this.yAMax = int(yMax*cellRes)
         
         this.width = int((xMax - xMin)*cellRes)
         this.height = int((yMax - yMin)*cellRes) 

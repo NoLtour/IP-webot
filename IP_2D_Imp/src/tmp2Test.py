@@ -22,6 +22,13 @@ import timeit
 import numpy as np
 
 
+main = np.array( [ [1,2], 
+                   [3,4] ] )
 
+print( main )
+
+mod = np.array( [ 0, 1 ] )
+
+print( np.where( main>1, main, 0 ) )
 
 
