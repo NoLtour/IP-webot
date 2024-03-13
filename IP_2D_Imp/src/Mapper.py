@@ -7,9 +7,29 @@ from dataclasses import dataclass, field
 
 from ImageProcessor import ImageProcessor 
 from typing import Union
-import random
+from random import random, seed
+from scipy.signal import convolve2d
 
 from matplotlib import pyplot as plt 
+
+def plot_image_gradient(  xG, yG):
+    # Get the dimensions of the image
+    height, width = xG.shape[:2]
+
+    # Create X and Y arrays using numpy.meshgrid
+    x = np.linspace(0, width - 1, width)
+    y = np.linspace(0, height - 1, height)
+    X, Y = np.meshgrid(x, y) 
+
+    # Create a quiver plot to visualize the gradient
+    plt.figure(15233)
+    plt.imshow(xG, extent=(x.min(), x.max(), y.min(), y.max()), origin='lower', cmap='viridis')
+    plt.colorbar(label='Image Intensity')
+
+    plt.quiver(X, Y, xG, yG, color='red', scale=0.1, scale_units='xy', angles='xy')
+    plt.title('2D Image Gradient')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
 
 def acuteAngle( a1, a2 ) -> float:
     """Returns the acute angle between a1 and a2 in radians"""
@@ -72,6 +92,7 @@ class ProcessedScan:
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.estimatedMap, cornerKernal )
         
         this.featurePositions, vals = ImageProcessor.findMaxima( Rval, maximaSearchRad, minMaxima )  
+        
  
         this.featureDescriptors = ImageProcessor.extractOrientations( this.estimatedMap, this.featurePositions[:,0], this.featurePositions[:,1], featureRadius, descriptorChannels )
 
@@ -141,7 +162,7 @@ class Mapper:
         else:
             this.scanBuffer.append( newScan ) 
     
-    def compareScans2( this, scan1: ProcessedScan, scan2: ProcessedScan, RANSACattempts=5 ):  
+    def compareScans2( this, scan1: ProcessedScan, scan2: ProcessedScan, RANSACattempts=5, maxSQSepError=0.4**2 ):  
         matchingSet1 = [] 
         matchingSet2 = []  
 
@@ -157,27 +178,74 @@ class Mapper:
                 set2size += len(matchingSet2[-1])
 
         # Done for debugging purposes (repeatability)
-        random.seed( set1size*set2size + set1size )
+        seed( set1size*set2size + set1size )
 
-        # Ensures that set1 is the larger one
+        """# Ensures that set1 is the larger one
         flipped = False
         if ( set1size < set2size ):
             set1size, set2size = set2size, set1size
             matchingSet1, matchingSet2 = matchingSet2, matchingSet1
-            flipped = True
+            flipped = True"""
 
-        # No checks to prevent duplicate checks
-        for i in range(0, RANSACattempts):
-
-
+        # These are randomly sampled values from set1, set2 
+        sampleSet1  = []
+        sampleSet2  = []
+        sampleCount = RANSACattempts*2
+        for i in range(0, sampleCount):
+            # Selects a random group, weighted according to group size
             point1SumIndex = int(random()*set1size)
-
-            sumSize    = 0
             pointGroup = 0
-            while ( sumSize <= point1SumIndex ): 
-                sumSize    += len(matchingSet1[pointGroup])
+            while ( point1SumIndex > 0 ): 
+                point1SumIndex -= len(matchingSet1[pointGroup])
                 pointGroup += 1
             pointGroup -= 1
+            
+            
+            # Selects a random group, weighted according to group size
+            point1SumIndex = int(random()*set1size)
+            pointGroup2 = 0
+            while ( point1SumIndex > 0 ): 
+                point1SumIndex -= len(matchingSet1[pointGroup2])
+                pointGroup2 += 1
+            pointGroup2 -= 1
+            
+            #sampleGroup.append( pointGroup )
+            # Selects random points from within that group TODO fix groups to work well, currently not using group system
+            sampleSet1.append( matchingSet1[pointGroup][ int(len(matchingSet1[pointGroup])*random()) ] ) 
+            sampleSet2.append( matchingSet2[pointGroup2][ int(len(matchingSet2[pointGroup2])*random()) ] ) 
+        
+        # Actually performs ransac
+        # TODO fix sample generation to ensure duplicates can't happen and overlaps can't happen
+        for i in range(0, RANSACattempts):
+            index1 = int( (random()+1)*sampleCount/2 )
+            index2 = int(random()*sampleCount/2)
+            
+            set1Point1 = sampleSet1[ index1 ]
+            set1Point2 = sampleSet1[ index2 ]
+            set2Point1 = sampleSet2[ index1 ]
+            set2Point2 = sampleSet2[ index2 ]
+            
+            # Ensure no duplicate sample points
+            if ( not (np.array_equiv(set1Point1[0], set1Point2[0]) or np.array_equiv(set2Point1[0], set2Point2[0])) ):
+                
+                # Checks that the match is resonable, (the distance between sets of points is simular)
+                seperationErrorSQ = abs(np.sum(np.square(set1Point1[0]-set1Point2[0])) - np.sum(np.square(set2Point1[0]-set2Point2[0]))) / scan1.constructedProbGrid.cellRes**2
+                if ( seperationErrorSQ < maxSQSepError ):
+                    vec1 = set1Point2[0]-set1Point1[0]
+                    vec2 = set2Point2[0]-set2Point1[0]
+                    
+                    angleChange    = np.arctan2( vec2[1], vec2[0] ) - np.arctan2( vec1[1], vec1[0] )
+                    positionChange = (set2Point1[0]-set1Point1[0]) / scan1.constructedProbGrid.cellRes
+                    
+                    #matchValues, matchIndecies = this.determineImageMatchSuccess( scan2, scan1, angleChange, positionChange )
+                    
+                    ""
+                
+            else:
+                ""
+        ""
+                
+        
     
     def computeAllFeatureMatches( this, scan1: ProcessedScan, scan2: ProcessedScan, minMatch=-1 ):  
         """ Naive approach """
@@ -206,9 +274,83 @@ class Mapper:
          
         return offsetScan
         
+    
+    def determineImageTranslation( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
+        """ compares two scans by translating them as specified, then calculating ... """
+ 
+        transScan = this.copyScanWithOffset( modScan, CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
+         
+        # +-1 offsets done to discriminate error prone edges
+        xAMin = max(refScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.xAMin)+1
+        xAMax = min(refScan.constructedProbGrid.xAMax, transScan.constructedProbGrid.xAMax)-1
+        yAMin = max(refScan.constructedProbGrid.yAMin, transScan.constructedProbGrid.yAMin)+1
+        yAMax = min(refScan.constructedProbGrid.yAMax, transScan.constructedProbGrid.yAMax)-1
         
+        # The overlap frames limits in grid cooridiantes (an integer scaled by resolution)
+        absLimits = np.array( [ [xAMin, yAMin], 
+                                [xAMax, yAMax] ] )
+        
+        # Translates overlap coordiantes to be in localised probability grid coordiantes
+        transLimits = (absLimits - np.array([transScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.yAMin])) 
+        refLimits   = (absLimits - np.array([refScan.constructedProbGrid.xAMin, refScan.constructedProbGrid.yAMin])) 
+        
+        # Extracts the region of intrest from both images
+        transWindow = transScan.estimatedMap.copy()[ transLimits[0][1]:transLimits[1][1], transLimits[0][0]:transLimits[1][0] ]
+        refWindow   = refScan.estimatedMap.copy()[ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
+         
+        plt.figure(25)
+        plt.imshow((refWindow - transWindow), origin='lower' )   
+        
+        mask = ((transWindow!=0) * (refWindow!=0))
+        transWindow *= mask
+        refWindow   *= mask 
+        
+        intrestMask = (convolve2d( refWindow>0, np.ones((13,13)), mode="same" )>0)*(convolve2d( transWindow>0, np.ones((13,13)), mode="same" )>0)
+        
+        errorWindow = (refWindow - transWindow) *intrestMask *np.abs(refWindow * transWindow)
+        #errorWindow *= np.abs(errorWindow)
+        
+        kernal = ImageProcessor.gaussian_kernel( 7, 2 )
+         
+        erDy, erDx = np.gradient( errorWindow )
+        
+        erDy = convolve2d( erDy, kernal, mode="same" ) *(refWindow<0)
+        erDx = convolve2d( erDx, kernal, mode="same" ) *(refWindow<0)
+        
+        erDy = convolve2d( erDy, kernal, mode="same" ) 
+        erDx = convolve2d( erDx, kernal, mode="same" ) 
+        
+        lengthScale = 2 * np.sqrt(np.sum(transWindow*(transWindow>0)))
+        yError = np.sum(erDy)/lengthScale
+        xError = np.sum(erDx)/lengthScale 
+        
+        # applying exponentials leads to non zero sums of gradients (steep gradients are bonused)
+        
+        #plot_image_gradient( erDx, erDy ) 
+         
+        
+        errorWindow *= refWindow<0
+        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow )
+        
+        plt.figure(21)
+        plt.imshow(  np.where( erDy==0, np.inf, erDy ), origin='lower' ) 
+        
+        plt.figure(22)
+        plt.imshow(  np.where( erDx==0, np.inf, erDx ), origin='lower' ) 
+        
+        
+        plt.figure(23)
+        plt.imshow(  transWindow, origin='lower' ) 
+        
+        plt.figure(24) 
+        plt.imshow(  refWindow, origin='lower' )  
+         
+        plt.show()
+        """"""
+        return xError, yError
+    
     def determineImageMatchSuccess( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
-        """ Naive approach, translates the modScan and then compares it with the refrance scan """
+        """ compares two scans by translating them as specified, then calculating the average diffecence between the scans """
  
         transScan = this.copyScanWithOffset( modScan, CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
          
@@ -244,7 +386,7 @@ class Mapper:
         
         errorWindow = np.where( errorWindow==0, np.inf, errorWindow )
         
-        plt.figure(21)
+        """plt.figure(21)
         plt.imshow(  np.where( transWindow==0, np.inf, transWindow ), origin='lower' ) 
         
         plt.figure(22)
@@ -258,41 +400,9 @@ class Mapper:
         plt.imshow(  refScan.estimatedMap, origin='lower' ) 
         
         plt.figure(25)
-        plt.colorbar(plt.imshow(  errorWindow, origin='lower' )) 
-        
-        """# The centre of this image, after being translated according to specified values
-        # It also gets this into resolution refrence frame
-        newModCentre = modScan.scanCentre 
-        newModCentre.addPose( CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
-        newModCentre.upscale( modScan.constructedProbGrid.cellRes )
-        newModCentre.forceInt()
-
-        newRefCentre = refScan.scanCentre.copy()
-        newRefCentre.upscale( refScan.constructedProbGrid.cellRes )
-        newRefCentre.forceInt()
-        awdawdawd 
-        
-        newModEstimatedMap = rotate( modScan.estimatedMap, rotation )
-        newRefEstimatedMap = refScan.estimatedMap
-
-        nMEMHalfWidth  = int(newModEstimatedMap.shape[1]/2)
-        nREMHalfWidth  = int(newRefEstimatedMap.shape[1]/2)
-        nMEMHalfHeight = int(newModEstimatedMap.shape[0]/2)
-        nREMHalfHeight = int(newRefEstimatedMap.shape[0]/2)
-
-        # Get both maps to be the same dimensions by determining the window of both of them
-        minX = (max( newModCentre.x-nMEMHalfWidth, newRefCentre.x-nREMHalfWidth ))
-        maxX = (min( newModCentre.x+nMEMHalfWidth, newRefCentre.x+nREMHalfWidth ))
-        minY = (max( newModCentre.y-nMEMHalfHeight, newRefCentre.y-nREMHalfHeight ))
-        maxY = (min( newModCentre.y+nMEMHalfHeight, newRefCentre.y+nREMHalfHeight ))
-
-        
-        plt.figure(12)
-        plt.imshow( newModEstimatedMap )
-
-        newModEstimatedMap = newModEstimatedMap[ minY-(newModCentre.y-nMEMHalfHeight):maxY-(newModCentre.y-nMEMHalfHeight), minX-(newModCentre.x-nMEMHalfWidth):maxX-(newModCentre.x-nMEMHalfWidth) ]
-        newRefEstimatedMap = newRefEstimatedMap[ minY-(newRefCentre.y-nREMHalfHeight):maxY-(newRefCentre.y-nREMHalfHeight), minX-(newRefCentre.x-nREMHalfWidth):maxX-(newRefCentre.x-nREMHalfWidth) ]
-"""
+        plt.colorbar(plt.imshow(  errorWindow, origin='lower' ))  
+        plt.show()"""
+        """"""
         return errorScore, mArea
 
     def compareScans( this, scan1: ProcessedScan, scan2: ProcessedScan ):

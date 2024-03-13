@@ -180,7 +180,7 @@ class ProbabilityGrid:
         middleScan = scanStack[int( len(scanStack)/2 )] 
         
         zeroPose = middleScan.pose.copy()
-        zeroPose.addPose( offsetPose )
+        zeroPose.subtractPose( offsetPose )
         
         for targScan in scanStack:
             targScan.calculateTerminations( maxScanDistance, zeroPose )

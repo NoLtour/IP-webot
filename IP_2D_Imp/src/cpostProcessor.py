@@ -129,28 +129,47 @@ def matchingTest2( frame1Index, frame2Index ):
     
     pointCol = ["rx", "bx", "gx", "yx", "mx", "cx", "wx", "ro", "bo", "go", "yo", "mo", "co", "ko", "wo", "r+", "b+", "g+", "y+", "m+", "c+", "k+", "w+"] 
 
-    matchValues, matchIndecies = mapper.computeAllFeatureMatches( scan1, scan2, 3 )
-
-    frameXChange = scan2.scanPose.x - scan1.scanPose.x
-    frameYChange = scan2.scanPose.y - scan1.scanPose.y
-    frameYawChange = scan2.scanPose.yaw - scan1.scanPose.yaw
-    errorScore, areaOverlap =  mapper.determineImageMatchSuccess( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
-
-    print( errorScore, areaOverlap )
-    
-    """plt.figure(21)
-    plt.imshow( nSc1, origin='lower' ) 
-    
-    plt.figure(22)
-    plt.imshow( nSc2, origin='lower' ) 
-
+    """mapper.compareScans2( scan1, scan2, 1402 )
     plt.figure(23)
     plt.imshow( scan1.estimatedMap )
     plt.plot( scan1.featurePositions[:,1], scan1.featurePositions[:,0], "rx" )
     
     plt.figure(24)
     plt.imshow( scan2.estimatedMap )
-    plt.plot( scan2.featurePositions[:,1], scan2.featurePositions[:,0], "rx" )"""
+    plt.plot( scan2.featurePositions[:,1], scan2.featurePositions[:,0], "rx" )
+    plt.show() """
+    
+    matchValues, matchIndecies = mapper.computeAllFeatureMatches( scan1, scan2, 3 )
+    
+
+    frameXChange = scan2.scanPose.x - scan1.scanPose.x 
+    frameYChange = scan2.scanPose.y - scan1.scanPose.y
+    frameYawChange = scan2.scanPose.yaw - scan1.scanPose.yaw
+    
+    xError, yError   = -0.1, 0
+    xOffset, yOffset = frameXChange, frameYChange
+    
+    errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, 0, [ xOffset, yOffset ] ) 
+    
+    #errorScore, areaOverlap =  mapper.determineImageTranslation( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
+
+    for i in range(0, 20):
+        xError, yError = mapper.determineImageTranslation( scan2, scan1, 0, [ xOffset, yOffset ] )
+        errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, 0, [ xOffset, yOffset ] )
+        print("error:", errorScore,"\n-------")
+        
+        xOffset -= xError
+        yOffset -= yError
+        
+        print( "newOffsets:", xOffset, yOffset )
+        
+    
+    """plt.figure(21)
+    plt.imshow( nSc1, origin='lower' ) 
+    
+    plt.figure(22)
+    plt.imshow( nSc2, origin='lower' ) """
+
 
     """plt.figure(23)
     plt.plot( matchValues ) """
@@ -171,8 +190,8 @@ for cRawScan in allScansRaw:
             
             #if ( len(mapper.allScans) > 6 ): 
             #    matchingTest2( 2, 3 )
-            if ( len(mapper.allScans) > 40 ): 
-                matchingTest2( 40, 38 )
+            if ( len(mapper.allScans) > 25 ): 
+                matchingTest2( 10, 25 )
 
             prevScan = scan
 
