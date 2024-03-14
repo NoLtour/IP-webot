@@ -21,3 +21,14 @@ from matplotlib import pyplot as plt
 import timeit
 import numpy as np
 
+vals = np.array([ 
+    [0, 3, 6], 
+    [1, 4, 7], 
+    [2, 5, 8], 
+ ])
+
+print( np.sum( vals, axis=0 ) )
+
+
+plt.imshow( vals, origin="lower" )
+plt.show()

@@ -146,22 +146,28 @@ def matchingTest2( frame1Index, frame2Index ):
     frameYChange = scan2.scanPose.y - scan1.scanPose.y
     frameYawChange = scan2.scanPose.yaw - scan1.scanPose.yaw
     
-    xError, yError   = -0.1, 0
-    xOffset, yOffset = frameXChange, frameYChange
+    xError, yError   = 0, 0
+    xOffset, yOffset, yawOffset = frameXChange-0, frameYChange+0, frameYawChange+np.deg2rad( 0 )
+    print( "initOffsets:", xOffset, yOffset, np.rad2deg(yawOffset) )
     
-    errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, 0, [ xOffset, yOffset ] ) 
+    errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, yawOffset, [ xOffset, yOffset ] ) 
     
     #errorScore, areaOverlap =  mapper.determineImageTranslation( scan1, scan2, frameYawChange, [frameXChange, frameYChange] )
 
-    for i in range(0, 20):
-        xError, yError = mapper.determineImageTranslation( scan2, scan1, 0, [ xOffset, yOffset ] )
-        errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, 0, [ xOffset, yOffset ] )
+    for i in range(0, 5):
+        xError, yError, yawError = mapper.determineImageTranslation( scan2, scan1, yawOffset, [ xOffset, yOffset ], True )
+        errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, yawOffset, [ xOffset, yOffset ] )
         print("error:", errorScore,"\n-------")
         
-        xOffset -= xError
-        yOffset -= yError
+        dampener = 0.8
+
+        xOffset -= xError * dampener
+        yOffset -= yError * dampener
+        yawOffset -= yawError * dampener
         
-        print( "newOffsets:", xOffset, yOffset )
+        print( "newOffsets:", xOffset, yOffset, np.rad2deg(yawOffset) )
+
+    mapper.determineImageTranslation( scan2, scan1, yawOffset, [ xOffset, yOffset ], True )
         
     
     """plt.figure(21)
@@ -185,17 +191,18 @@ for cRawScan in allScansRaw:
         if ( np.max( scan.constructedProbGrid.positiveData ) != 0 ): 
             fPos = scan.featurePositions
             
-            gridDisp.parseData( scan.estimatedMap, fPos[:,1], fPos[:,0]  )
+            #gridDisp.parseData( scan.estimatedMap, fPos[:,1], fPos[:,0]  )
             #gridDisp2.parseData( Rval*1000, maxPos[:,1], maxPos[:,0]  )
             
             #if ( len(mapper.allScans) > 6 ): 
             #    matchingTest2( 2, 3 )
-            if ( len(mapper.allScans) > 25 ): 
-                matchingTest2( 10, 25 )
+            if ( len(mapper.allScans) > 23 ): 
+                matchingTest2( 22, 23 )
 
             prevScan = scan
+            print("i: ",len(mapper.allScans))
 
-            lpWindow.render()
+            #lpWindow.render()
  
             #sleep(0.1)
 

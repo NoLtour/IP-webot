@@ -275,7 +275,7 @@ class Mapper:
         return offsetScan
         
     
-    def determineImageTranslation( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
+    def determineImageTranslation( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float], show=False ):
         """ compares two scans by translating them as specified, then calculating ... """
  
         transScan = this.copyScanWithOffset( modScan, CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
@@ -298,8 +298,6 @@ class Mapper:
         transWindow = transScan.estimatedMap.copy()[ transLimits[0][1]:transLimits[1][1], transLimits[0][0]:transLimits[1][0] ]
         refWindow   = refScan.estimatedMap.copy()[ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
          
-        plt.figure(25)
-        plt.imshow((refWindow - transWindow), origin='lower' )   
         
         mask = ((transWindow!=0) * (refWindow!=0))
         transWindow *= mask
@@ -308,31 +306,167 @@ class Mapper:
         intrestMask = (convolve2d( refWindow>0, np.ones((13,13)), mode="same" )>0)*(convolve2d( transWindow>0, np.ones((13,13)), mode="same" )>0)
         
         errorWindow = (refWindow - transWindow) *intrestMask *np.abs(refWindow * transWindow)
+         
+        if (show):
+            plt.figure(20)
+            plt.imshow(refWindow - transWindow, origin='lower' )   
+            plt.show() 
+        
+        kernal = ImageProcessor.gaussian_kernel( 7, 2 )
+         
+        erDy, erDx = np.gradient( errorWindow )  
+        
+        erDy = convolve2d( erDy, kernal, mode="same" ) *(refWindow<0)
+        erDx = convolve2d( erDx, kernal, mode="same" ) *(refWindow<0)
+        
+        # Imperical adjustments made to make final errors more accurate
+        erDy = 0.3*convolve2d( erDy, kernal, mode="same" ) 
+        erDx = 0.7*convolve2d( erDx, kernal, mode="same" ) 
+        
+        # Length scale keeps errors consistantly sized
+        lengthScale = np.sqrt(np.sum(transWindow*(transWindow>0)))
+        yError = np.sum(erDy)/lengthScale
+        xError = np.sum(erDx)/lengthScale 
+ 
+
+        rows, cols = errorWindow.shape  
+        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+        origin = (refScan.scanPose.x*refScan.constructedProbGrid.cellRes - xAMin, refScan.scanPose.y*refScan.constructedProbGrid.cellRes - yAMin)
+        x_offset = x_coords - origin[0]
+        y_offset = y_coords - origin[1]
+
+        # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
+        sepLen = ( np.square(x_offset) + np.square(y_offset) )
+        x_tangential_vector = y_offset/sepLen
+        y_tangential_vector = -x_offset/sepLen 
+
+        angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)/lengthScale
+        angleError *= 60
+
+        xError -= (1-np.cos(angleError))
+        yError -= (np.sin(angleError))   
+
+        errorWindow *= refWindow<0
+        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+
+        return xError, yError, angleError
+    
+    def determineImageTranslationLEGACY( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float], show=False ):
+        """ compares two scans by translating them as specified, then calculating ... """
+ 
+        transScan = this.copyScanWithOffset( modScan, CartesianPose( translation[0], translation[1], 0, 0, 0, rotation ) )
+         
+        # +-1 offsets done to discriminate error prone edges
+        xAMin = max(refScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.xAMin)+1
+        xAMax = min(refScan.constructedProbGrid.xAMax, transScan.constructedProbGrid.xAMax)-1
+        yAMin = max(refScan.constructedProbGrid.yAMin, transScan.constructedProbGrid.yAMin)+1
+        yAMax = min(refScan.constructedProbGrid.yAMax, transScan.constructedProbGrid.yAMax)-1
+        
+        # The overlap frames limits in grid cooridiantes (an integer scaled by resolution)
+        absLimits = np.array( [ [xAMin, yAMin], 
+                                [xAMax, yAMax] ] )
+        
+        # Translates overlap coordiantes to be in localised probability grid coordiantes
+        transLimits = (absLimits - np.array([transScan.constructedProbGrid.xAMin, transScan.constructedProbGrid.yAMin])) 
+        refLimits   = (absLimits - np.array([refScan.constructedProbGrid.xAMin, refScan.constructedProbGrid.yAMin])) 
+        
+        # Extracts the region of intrest from both images
+        transWindow = transScan.estimatedMap.copy()[ transLimits[0][1]:transLimits[1][1], transLimits[0][0]:transLimits[1][0] ]
+        refWindow   = refScan.estimatedMap.copy()[ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
+         
+        
+        mask = ((transWindow!=0) * (refWindow!=0))
+        transWindow *= mask
+        refWindow   *= mask 
+        
+        intrestMask = (convolve2d( refWindow>0, np.ones((13,13)), mode="same" )>0)*(convolve2d( transWindow>0, np.ones((13,13)), mode="same" )>0)
+        
+        errorWindow = (refWindow - transWindow) *intrestMask *np.abs(refWindow * transWindow)
+        #plt.figure(25)
+        #plt.imshow(errorWindow, origin='lower' ) 
+        if (show):
+            plt.figure(20)
+            plt.imshow(refWindow - transWindow, origin='lower' )   
+            plt.show()
         #errorWindow *= np.abs(errorWindow)
         
         kernal = ImageProcessor.gaussian_kernel( 7, 2 )
          
         erDy, erDx = np.gradient( errorWindow )
+
+        curl = (np.gradient(erDy)[0] - np.gradient(erDx)[1] ) *(refWindow<0) 
+
+        """rows, cols = errorWindow.shape  
+        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows))
+        x_coords = (x_coords+(xAMin - refScan.scanPose.x*refScan.constructedProbGrid.cellRes)).flatten()
+        y_coords = (y_coords+(yAMin - refScan.scanPose.y*refScan.constructedProbGrid.cellRes)).flatten()
+        e_vals   = errorWindow.flatten()
+        pflat_mask = (e_vals)>0.1
+        nflat_mask = (e_vals)<-0.1
+        mags = np.sqrt( np.square( x_coords ) + np.square( y_coords ) ) 
+        rads = np.arctan2( y_coords, x_coords ) 
+        
+        plt.figure(40)
+        plt.xlabel( "magnitude" )
+        plt.ylabel( "angle" )
+        plt.plot( mags[nflat_mask], rads[nflat_mask], "rx" )
+        plt.plot( mags[pflat_mask], rads[pflat_mask], "bx" )"""
         
         erDy = convolve2d( erDy, kernal, mode="same" ) *(refWindow<0)
         erDx = convolve2d( erDx, kernal, mode="same" ) *(refWindow<0)
         
-        erDy = convolve2d( erDy, kernal, mode="same" ) 
-        erDx = convolve2d( erDx, kernal, mode="same" ) 
+        # Imperical adjustments made to make final errors more accurate
+        erDy = 0.3*convolve2d( erDy, kernal, mode="same" ) 
+        erDx = 0.7*convolve2d( erDx, kernal, mode="same" ) 
         
-        lengthScale = 2 * np.sqrt(np.sum(transWindow*(transWindow>0)))
+        lengthScale = np.sqrt(np.sum(transWindow*(transWindow>0)))
         yError = np.sum(erDy)/lengthScale
         xError = np.sum(erDx)/lengthScale 
+ 
+
+        rows, cols = errorWindow.shape  
+        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+        origin = (refScan.scanPose.x*refScan.constructedProbGrid.cellRes - xAMin, refScan.scanPose.y*refScan.constructedProbGrid.cellRes - yAMin)
+        x_offset = x_coords - origin[0]
+        y_offset = y_coords - origin[1]
+
+        sepLen = ( np.square(x_offset) + np.square(y_offset) )
+        x_tangential_vector = y_offset/sepLen
+        y_tangential_vector = -x_offset/sepLen
+
+        refCOM = (np.sum( np.maximum(refWindow,0)*intrestMask*x_coords )/np.sum( np.maximum(refWindow,0)*intrestMask ), np.sum( np.maximum(refWindow,0)*intrestMask*y_coords )/np.sum( np.maximum(refWindow,0)*intrestMask ))
+        traCOM = (np.sum( np.maximum(transWindow,0)*intrestMask*x_coords )/np.sum( np.maximum(transWindow,0)*intrestMask ), np.sum( np.maximum(transWindow,0)*intrestMask*y_coords )/np.sum( np.maximum(transWindow,0)*intrestMask ))
+        plt.plot( [ origin[0], refCOM[0] ], [ origin[1], refCOM[1] ], "bx-" )   
+        plt.plot( [ origin[0], traCOM[0] ], [ origin[1], traCOM[1] ], "rx-" )    
+        
+        #plt.figure(99) 
+        #plt.colorbar( plt.imshow( x_tangential_vector*erDx + y_tangential_vector*erDy, origin='lower' ) )
+
+        angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)/lengthScale
+        angleError *= 60
+
+        xError -= (1-np.cos(angleError))
+        yError -= (np.sin(angleError)) 
+         
+        #print( "dx:",xError,"  dy:",yError,"  da:", np.rad2deg(angleError) )
+
+        """lump = np.sum( np.maximum( refWindow*intrestMask, 0 ), axis=0 )
+
+        plt.figure(40) 
+        plt.plot( np.sum( erDy, axis=0 )/lump, "r-" )
+        plt.plot( np.sum( erDx, axis=0 )/lump, "b-" ) 
+ 
+        plt.figure(41) 
+        plt.plot( lump, "r-" ) """
         
         # applying exponentials leads to non zero sums of gradients (steep gradients are bonused)
         
-        #plot_image_gradient( erDx, erDy ) 
-         
-        
+        #plot_image_gradient( erDx, erDy )  
+
         errorWindow *= refWindow<0
         errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow )
         
-        plt.figure(21)
+        """plt.figure(21)
         plt.imshow(  np.where( erDy==0, np.inf, erDy ), origin='lower' ) 
         
         plt.figure(22)
@@ -343,11 +477,11 @@ class Mapper:
         plt.imshow(  transWindow, origin='lower' ) 
         
         plt.figure(24) 
-        plt.imshow(  refWindow, origin='lower' )  
+        plt.imshow(  refWindow, origin='lower' )  """
          
-        plt.show()
+        #plt.show()
         """"""
-        return xError, yError
+        return xError, yError, angleError
     
     def determineImageMatchSuccess( this, modScan: ProcessedScan, refScan: ProcessedScan, rotation:float, translation: Union[float, float] ):
         """ compares two scans by translating them as specified, then calculating the average diffecence between the scans """
