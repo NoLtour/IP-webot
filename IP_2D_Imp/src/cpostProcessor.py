@@ -147,7 +147,7 @@ def matchingTest2( frame1Index, frame2Index ):
     frameYawChange = scan2.scanPose.yaw - scan1.scanPose.yaw
     
     xError, yError   = 0, 0
-    xOffset, yOffset, yawOffset = frameXChange-0, frameYChange+0, frameYawChange+np.deg2rad( 0 )
+    xOffset, yOffset, yawOffset = frameXChange-0, frameYChange+0, frameYawChange+np.deg2rad( 4 )
     print( "initOffsets:", xOffset, yOffset, np.rad2deg(yawOffset) )
     
     errorScore, mArea = mapper.determineImageMatchSuccess( scan2, scan1, yawOffset, [ xOffset, yOffset ] ) 
@@ -197,7 +197,7 @@ for cRawScan in allScansRaw:
             #if ( len(mapper.allScans) > 6 ): 
             #    matchingTest2( 2, 3 )
             if ( len(mapper.allScans) > 23 ): 
-                matchingTest2( 22, 23 )
+                matchingTest2( 5, 23 )
 
             prevScan = scan
             print("i: ",len(mapper.allScans))
