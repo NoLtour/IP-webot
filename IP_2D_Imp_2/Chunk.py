@@ -43,7 +43,17 @@ class Chunk:
 
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
 
+    def getRawFrameData( this ):
+        """ returns raw frames found within this chunk structure, as well as the offsets to be applied to get them all into this chunks
+         coordinate frame """
+        
+        if ( this.isScanWrapper ):
+            
+            
+        else:
 
+
+        return frameList, offsetList
 
     """ SECTION - image construction """
 
