@@ -74,8 +74,7 @@ class ScanFrame:
     
 
 
-def exportScanFrames( scanStack: list[ScanFrame], fileName:str ): 
-
+def exportScanFrames( scanStack: list[ScanFrame], fileName:str ):  
     rawExport = jsonpickle.encode( scanStack )
     with open( fileName, "w" ) as targFile:
         targFile.write( rawExport )

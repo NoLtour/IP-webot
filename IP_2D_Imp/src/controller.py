@@ -1,5 +1,4 @@
-import sys
-print(sys.path) 
+import sys 
 
 import numpy as np
 import datetime
@@ -14,15 +13,21 @@ from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 
 from simulation_zeroros.console import Console
 
-from Navigator import Navigator, CartesianPose
+from Navigator import Navigator, CartesianPose 
 from Mapper import Mapper
 from ProbabilityGrid import exportScanFrames, importScanFrames
 from ImageProcessor import ImageProcessor 
 
-import time 
-import livePlotter as lp
+import importlib.util 
+# Absolute path to the Python file
+file_path = "C:\\IP-webot\\IP_2D_Imp_2\\RawScanFrame.py" 
+# Load the module from the file
+spec = importlib.util.spec_from_file_location("module_name", file_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module) 
 
- 
+import livePlotter as lp
+import time 
 
 class MAP_PROP:
     X_MIN = -4
@@ -65,11 +70,15 @@ class RobotController:
         this.wheel_diameter = 0.135"""
         
         this.navigator = Navigator( this.wheel_diameter, this.wheel_seperation )
-        this.mapper = Mapper( this.navigator )
+        #this.mapper = Mapper( this.navigator )
         this.navigator.addTarget(2, 0)
         this.navigator.addTarget(2, -2)
         this.navigator.addTarget(0, -2)
         this.navigator.addTarget(0, 0)
+        
+        this.navigatorWithError = Navigator( this.wheel_diameter, this.wheel_seperation )
+        
+        this.allRawScans = []
         
         """this.navigator.addTarget(1, 0)
         this.navigator.addTarget(1, 1)
@@ -103,7 +112,12 @@ class RobotController:
         """  """ 
         
         lVel, rVel = this.navigator.desiredTargetMVels()
+        this.setWheelVelocity( lVel, rVel )
         
+        if (not this.navigator.hasTarget()):
+            RawScanFrame.exportScanFrames( this.allRawScans, "cleanData" )
+        
+        return
         lpRoboDisplay.parseData( this.navigator.currentPose, this.realPose, [[0],[0]] ) 
         if ( len(this.mapper.allScans) != 0 ):
             #gridDisp.parseData( this.mapper.allScans[-1].gridData )
@@ -136,8 +150,7 @@ class RobotController:
         #this.gridMapper.simpleICPSolve( foundInterceptGrid, pointCloudNP )
          
         lpWindow.render()
-        
-        this.setWheelVelocity( lVel, rVel )
+         
         #this.setWheelVelocity( 0.5, 1 )
         
     def setWheelVelocity(this, leftVel, rightVel):
@@ -153,8 +166,9 @@ class RobotController:
     def encoder_callback(this, msg):
         leftRotation = msg.x
         rightRotation = msg.y 
-        this.navigator.updatePosition( leftRotation, rightRotation )
-        #print("updated positon: ", this.navigator.currentPose.x, this.navigator.currentPose.y, this.navigator.currentPose.yaw)
+        
+        this.navigatorWithError.updatePosition( leftRotation, rightRotation )
+        print("updated positon: ", this.navigatorWithError.currentPose.x, this.navigatorWithError.currentPose.y, this.navigatorWithError.currentPose.yaw)
          
          
         
@@ -180,7 +194,7 @@ class RobotController:
             this.realPose = CartesianPose( xPos - this.initRealPose.x
                                           , yPos-this.initRealPose.y, 0, 0, 0, yaw-this.initRealPose.yaw ) 
             
-        #this.navigator.currentPose = this.realPose
+        this.navigator.currentPose = this.realPose
         
     def laserscan_callback(this, msg):
         """This is a callback function that is called whenever a message is received
@@ -198,8 +212,15 @@ class RobotController:
         - intensities: float32[] - intensity data ## NOT USED ##
         """
         # print("Received message: ", msg)
-        this.laserscan = msg
-        this.mapper.pushLidarScan( msg )
+        this.laserscan = msg 
+        
+        this.allRawScans.append( RawScanFrame(
+            np.array(msg.ranges),
+            -msg.angle_min - np.arange( 0, len(msg.ranges) )*msg.angle_increment,
+            this.navigatorWithError.currentPose,
+            this.realPose
+        ) ) 
+        #this.mapper.pushLidarScan( msg )
         
         #this.gridMapper.pushScanCloud( ControllerMaths.ProtoLIDARInterp.calculateAbsolutePositions( this.navigator.posTracker.worldPose, msg ) )
         
