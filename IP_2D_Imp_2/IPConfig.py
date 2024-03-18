@@ -7,14 +7,14 @@ class IPConfig:
     OBJECT_DIAMETER = 0.5
     OBJECT_PIX_RADI = int(GRID_RESOLUTION*OBJECT_DIAMETER/2)
     OBJECT_PIX_DIAM = OBJECT_PIX_RADI*2 + 1
-    MAX_FRAMES_MERGE = 7
+    MAX_FRAMES_MERGE = 5
     MAX_INTER_FRAME_ANGLE = np.rad2deg(20)
 
     # Scan propreties
     MAX_LIDAR_LENGTH = 8
 
     # Image estimation
-    IE_OBJECT_SIZE = 0.5 *OBJECT_DIAMETER
+    IE_OBJECT_DIAM = 0.5 *OBJECT_DIAMETER
     IE_SHARPNESS   = 2.6
 
     # Corner detector

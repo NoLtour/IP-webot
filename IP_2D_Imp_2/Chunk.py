@@ -4,6 +4,11 @@ from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree
 from CartesianPose import CartesianPose
 from ProbabilityGrid import ProbabilityGrid
+from CommonLib import gaussian_kernel
+
+from scipy.signal import convolve2d
+from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
+import numpy as np
 
 from IPConfig import IPConfig
 
@@ -16,20 +21,27 @@ class Chunk:
     unifiedScan: RawScanFrame = None
     rawScans:  list[RawScanFrame] = None
     centreScanIndex: int = None
-    subChunks: Chunk = None
+    subChunks: list[Chunk] = None 
+    centreChunkIndex: int = None
     config: IPConfig = IPConfig() # Can be changed
+
+    """ RELATIONAL PROPERTIES - AS A CHILD """
+    offsetFromParent: CartesianPose = None
+    parent: Chunk = None
+    """ This is given in the parent's coordinate frame! With the parent existing at 0,0 with the x axis aligned to its rotation! """
     
     """ MODIFICATION INFO - information relating to properties of this class and if they've been edited (hence requiring recalculation elsewhere) """
     
     """ CACHED MAPPED DATA """
     cachedProbabilityGrid: ProbabilityGrid = None
-    
+    cachedMapEstimate:     np.ndarray      = None 
 
     """ SECTION - constructors (static) """
     @staticmethod
-    def initFromRawScans( inputScans:list[RawScanFrame], centreIndex:int=-1 ) -> Chunk:
+    def initFromRawScans( inputScans:list[RawScanFrame], config:IPConfig, centreIndex:int=-1 ) -> Chunk:
         """ The initialisation method to be used when constructing the Chunk out of frames, centreIndex is -1 to auto select a resonable one """
         this = Chunk()
+        this.config = config
 
         if ( centreIndex == -1 ):
             this.centreScanIndex = int(len(inputScans)/2)
@@ -42,16 +54,77 @@ class Chunk:
         return this
 
     @staticmethod 
-    def initEmpty() -> Chunk:
+    def initEmpty( config:IPConfig ) -> Chunk:
         """ The initialisation method to be used when constructing the Chunk, this is for constructing chunks to be made of sub-chunks """
         this = Chunk()
+        this.config = config
 
-        this.isScanWrapper = False
+        this.isScanWrapper = False 
+        this.subChunks = []
 
         return this 
     
+    """ SECTION - mergers? """ 
+    def addChunks( this, subChunks:list[Chunk] ):
+        """ Adds chunks, establishing relations between them """
+        this.subChunks.extend( subChunks )
+        for nSubChunk in subChunks:
+            nSubChunk.parent = this
+
+        this.determineCentreChunk()
+
+        ""
+
+    def determineCentreChunk( this, forcedValue=-1 ):
+        """ Sets the centre of this chunk to be the midpoint of the list, it then finds the subchunks relative offsets
+            currently cannot change chunk centre after initilization!
+           """
+        if ( this.centreChunkIndex != None ):
+            raise RuntimeError("Not yet implemented")
+
+        else:
+            if ( forcedValue == -1 ):
+                this.centreChunkIndex = int(len(this.subChunks)/2)
+            else:
+                this.centreChunkIndex = forcedValue 
+            
+            for otherChunk in this.subChunks:
+                X, Y, yaw = otherChunk.determineInitialOffset()
+                 
+                otherChunk.offsetFromParent = CartesianPose( X, Y, 0, 0, 0, yaw )
 
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
+
+    def getMapPose( this ):
+        """ This is the chunks currently believed absolute position, atleast relative to the highest parent """
+        # TODO make this return the estimated pose AFTER finding offsets of this node from whatever is defined as the origin
+        NotImplemented
+        return this.subChunkOffsets
+    
+    def determineInitialOffset( this ):
+        """ This makes the initial estimation of this chunks offset from it's parent, returning a pose representing the offset
+          the returned pose is interms of the parent's orientation (forward, upward, alignedYaw)
+              """
+        
+        # TODO current implementation only makes use of first raw position data
+        parentCentre = this.parent.getRawCentre().pose
+        thisCentre = this.getRawCentre().pose
+        
+        X = thisCentre.x - parentCentre.x
+        Y = thisCentre.y - parentCentre.y
+        alpha = thisCentre.yaw - parentCentre.yaw
+
+        seperation = np.sqrt( X**2 + Y**2 )
+        vecAngle   = np.arctan2( Y, X )- parentCentre.yaw 
+
+        return seperation*np.cos( vecAngle ), seperation*np.sin( vecAngle ), alpha
+
+    def getRawCentre( this ):
+        """ This recursively follows the centres of the chunk until the lowest raw middle scan is found """
+        if ( this.isScanWrapper ):
+            return this.rawScans[ this.centreScanIndex ]
+        else:
+            return this.subChunks[ this.centreChunkIndex ].getRawCentre()
 
     def getRawFrameData( this ):
         """ returns raw frames found within this chunk structure, as well as the offsets to be applied to get them all into this chunks
@@ -72,7 +145,7 @@ class Chunk:
         noOffset = offset==-1
         if ( noOffset ):
             if ( this.cachedProbabilityGrid != None ):
-                return this.c
+                return this.cachedProbabilityGrid, this.cachedMapEstimate
             offset = CartesianPose.zero() 
         
         if ( this.isScanWrapper ):
@@ -83,18 +156,36 @@ class Chunk:
                 this.config.MAX_LIDAR_LENGTH,
                 offset
             )
+            estimatedMap = this.estimateFeatures( probGrid )
             
             if ( noOffset ):
                 this.cachedProbabilityGrid = probGrid
-                
-            return probGrid
+                this.cachedMapEstimate     = estimatedMap
+ 
+            return probGrid, estimatedMap
             
             
         else:
-            NOTIMPLEMENTED
+            ""
         
+         
+    def estimateFeatures( this, inpGrid:ProbabilityGrid ):
+        """ Function to fill in object to be more realistic representation of environment """
+
+        if ( np.all( inpGrid.positiveData == 0 ) ):
+            return - inpGrid.negativeData/2
+
+        estimatedWidth = this.config.IE_OBJECT_DIAM
+        sharpnessMult  = this.config.IE_SHARPNESS
+
+        """ Uses a model of the environment to partially fill in missing data """
+        pixelWidth = estimatedWidth*inpGrid.cellRes
+        kern = gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
+        kern /= np.max(kern)
         
+        oup = np.maximum(convolve2d( inpGrid.positiveData, kern, mode="same" ) - inpGrid.negativeData*pixelWidth*sharpnessMult, 0)
         
+        return np.minimum( oup/np.max(oup)+inpGrid.positiveData, 1 ) - inpGrid.negativeData/2
 
 
     

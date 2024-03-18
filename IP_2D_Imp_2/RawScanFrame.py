@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass, field
-import CartesianPose
+from CartesianPose import CartesianPose
 from scipy.signal import convolve2d
 import jsonpickle
 

@@ -72,8 +72,8 @@ class ProbabilityGrid:
             
             # A version of scan distances where values: inf -> maxLength
             adjustedDistances = np.where( isInf, maxScanDistance, targScan.scanDistances ) 
-            xPoints = targScan.pose.x - offsetPose.x + adjustedDistances * np.cos( targScan.scanAngles + targScan.pose.yaw - offsetPose.yaw )
-            yPoints = targScan.pose.y - offsetPose.y + adjustedDistances * np.sin( targScan.scanAngles + targScan.pose.yaw - offsetPose.yaw )
+            xPoints = targScan.pose.x - zeroPose.x + adjustedDistances * np.cos( targScan.scanAngles + targScan.pose.yaw - zeroPose.yaw )
+            yPoints = targScan.pose.y - zeroPose.y + adjustedDistances * np.sin( targScan.scanAngles + targScan.pose.yaw - zeroPose.yaw )
             
             scanTerminations.append( [ xPoints, yPoints ] )
             scanNoHits.append( isInf )
@@ -86,7 +86,7 @@ class ProbabilityGrid:
         
         finalGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
         
-        for targScan, terminations, noHits in zip(targScan, scanTerminations, scanNoHits):
+        for targScan, terminations, noHits in zip(scanStack, scanTerminations, scanNoHits):
             nProbGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
             nProbGrid.addPolyLines( targScan.pose.x - zeroPose.x, targScan.pose.y - zeroPose.y, 
                                terminations[0], terminations[1], noHits  )
@@ -106,7 +106,8 @@ class ProbabilityGrid:
         finalGrid.negativeData /= len(scanStack)
         finalGrid.positiveData /= len(scanStack) 
         
-        finalGrid.clipData()
+        finalGrid.negativeData = finalGrid.negativeData.clip( -1, 1 )
+        finalGrid.positiveData = finalGrid.positiveData.clip( -1, 1 )
                 
         return finalGrid 
 
