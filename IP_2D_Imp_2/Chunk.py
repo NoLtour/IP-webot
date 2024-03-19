@@ -33,8 +33,7 @@ class Chunk:
     """ MODIFICATION INFO - information relating to properties of this class and if they've been edited (hence requiring recalculation elsewhere) """
     
     """ CACHED MAPPED DATA """
-    cachedProbabilityGrid: ProbabilityGrid = None
-    cachedMapEstimate:     np.ndarray      = None 
+    cachedProbabilityGrid: ProbabilityGrid = None 
 
     """ SECTION - constructors (static) """
     @staticmethod
@@ -72,8 +71,6 @@ class Chunk:
             nSubChunk.parent = this
 
         this.determineCentreChunk()
-
-        ""
 
     def determineCentreChunk( this, forcedValue=-1 ):
         """ Sets the centre of this chunk to be the midpoint of the list, it then finds the subchunks relative offsets
@@ -145,7 +142,7 @@ class Chunk:
         noOffset = offset==-1
         if ( noOffset ):
             if ( this.cachedProbabilityGrid != None ):
-                return this.cachedProbabilityGrid, this.cachedMapEstimate
+                return this.cachedProbabilityGrid 
             offset = CartesianPose.zero() 
         
         if ( this.isScanWrapper ):
@@ -156,36 +153,16 @@ class Chunk:
                 this.config.MAX_LIDAR_LENGTH,
                 offset
             )
-            estimatedMap = this.estimateFeatures( probGrid )
+            probGrid.estimateFeatures( this.config.IE_OBJECT_DIAM, this.config.IE_SHARPNESS ) 
             
             if ( noOffset ):
-                this.cachedProbabilityGrid = probGrid
-                this.cachedMapEstimate     = estimatedMap
+                this.cachedProbabilityGrid = probGrid 
  
-            return probGrid, estimatedMap
-            
-            
+            return probGrid
+             
         else:
             ""
         
-         
-    def estimateFeatures( this, inpGrid:ProbabilityGrid ):
-        """ Function to fill in object to be more realistic representation of environment """
-
-        if ( np.all( inpGrid.positiveData == 0 ) ):
-            return - inpGrid.negativeData/2
-
-        estimatedWidth = this.config.IE_OBJECT_DIAM
-        sharpnessMult  = this.config.IE_SHARPNESS
-
-        """ Uses a model of the environment to partially fill in missing data """
-        pixelWidth = estimatedWidth*inpGrid.cellRes
-        kern = gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
-        kern /= np.max(kern)
-        
-        oup = np.maximum(convolve2d( inpGrid.positiveData, kern, mode="same" ) - inpGrid.negativeData*pixelWidth*sharpnessMult, 0)
-        
-        return np.minimum( oup/np.max(oup)+inpGrid.positiveData, 1 ) - inpGrid.negativeData/2
 
 
     

@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import livePlotter as lp
 from IPConfig import IPConfig
 
+import numpy as np
+from scipy.ndimage import rotate
+
 from Chunk import Chunk
 
 print("importing...")
@@ -39,9 +42,10 @@ for i in range( 0, len(allScanData) ):
         nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
         rawStack = [ rawStack[-1] ] 
         nChunk.constructProbabilityGrid() 
+ 
+        gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
 
-         
-        gridDisp2.parseData( nChunk.cachedMapEstimate ) 
+        gridDisp.parseData( nChunk.cachedProbabilityGrid.copyRotated( np.deg2rad( 20 ) ).mapEstimate  ) 
         lpWindow.render()
 
         chunkStack.append( nChunk )

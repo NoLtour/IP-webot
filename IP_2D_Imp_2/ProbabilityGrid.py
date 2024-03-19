@@ -6,6 +6,7 @@ from skimage.draw import polygon2mask, line
 import jsonpickle
 from RawScanFrame import RawScanFrame
 from CartesianPose import CartesianPose
+from scipy.ndimage import rotate
 
 from CommonLib import gaussian_kernel
 
@@ -15,6 +16,7 @@ class ProbabilityGrid:
     
     negativeData: np.ndarray
     positiveData: np.ndarray
+    mapEstimate: np.ndarray
     
     xMin:float
     xMax:float
@@ -144,6 +146,49 @@ class ProbabilityGrid:
         #                    observation region masked by where objects don't exist
         this.negativeData += observationRegion * (interceptionRegion==0)
 
+    def copyRotated( this, angle, onlyRotateEstimate=False ):
+        """ returns a new probability grid which is this but rotated by angle """
 
+        AXCentre = (this.xAMin+this.xAMax)*0.5
+        AYCentre = (this.yAMin+this.yAMax)*0.5
 
+        nNegative = None
+        nPositive = None
+        nEstimate = rotate( this.mapEstimate, np.rad2deg( angle ) ) 
 
+        if ( not onlyRotateEstimate ):
+            nNegative = rotate( this.negativeData, np.rad2deg( angle ) )
+            nPositive = rotate( this.positiveData, np.rad2deg( angle ) ) 
+ 
+        nAWidth  = nEstimate.shape[1]
+        nAHeight = nEstimate.shape[0]
+
+        nAXMin = int(AXCentre-nAWidth*0.5)
+        nAXMax = nAXMin+nAWidth
+
+        nAYMin = int(AYCentre-nAHeight*0.5)
+        nAYMax = nAYMin+nAHeight
+
+        res = this.cellRes
+
+        nGrid = ProbabilityGrid( nAXMin/res, nAXMax/res, nAYMin/res, nAYMax/res, res )
+        nGrid.negativeData = nNegative
+        nGrid.positiveData = nPositive
+        nGrid.mapEstimate  = nEstimate
+
+        return nGrid
+
+    def estimateFeatures( this, estimatedWidth, sharpnessMult ):
+        """ Function to fill in object to be more realistic representation of environment """
+
+        if ( np.all( this.positiveData == 0 ) ):
+            return - this.negativeData/2 
+
+        """ Uses a model of the environment to partially fill in missing data """
+        pixelWidth = estimatedWidth*this.cellRes
+        kern = gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
+        kern /= np.max(kern)
+        
+        oup = np.maximum(convolve2d( this.positiveData, kern, mode="same" ) - this.negativeData*pixelWidth*sharpnessMult, 0)
+        
+        this.mapEstimate = np.minimum( oup/np.max(oup)+this.positiveData, 1 ) - this.negativeData/2
