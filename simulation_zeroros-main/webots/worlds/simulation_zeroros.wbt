@@ -30,7 +30,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.005398042650515628 0.9999705508825947 0.005455135479832842 1.5608286177774473
-  position 0.7550467011673581 1.3212048997842805 15.742353169132707
+  position 0.8446099029795104 1.3221974788200093 6.783248444709514
   follow "MyBot"
 }
 TexturedBackground {
@@ -307,7 +307,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999998133 0.075
+        translation 0 0.13499999999998 0.075
         rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
@@ -440,6 +440,7 @@ DEF ROBOT Robot {
           ]
         }
       ]
+      rotationStep 0.261799
       horizontalResolution 128
       fieldOfView 1.57
       numberOfLayers 1
@@ -483,6 +484,7 @@ DEF ROBOT Robot {
             ]
           }
         ]
+        rotationStep 0.261799
       }
     }
   ]

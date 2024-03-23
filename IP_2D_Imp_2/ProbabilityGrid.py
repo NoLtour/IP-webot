@@ -8,6 +8,8 @@ from RawScanFrame import RawScanFrame
 from CartesianPose import CartesianPose
 from scipy.ndimage import rotate
 
+import matplotlib.pyplot as plt
+
 from CommonLib import gaussian_kernel
 
 class ProbabilityGrid:
@@ -170,11 +172,29 @@ class ProbabilityGrid:
         nAYMax = nAYMin+nAHeight
 
         res = this.cellRes
+         
+        # Now it trims the output to remove waste
+        nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
+        nonZeroXLines = np.any(nEstimate != 0, axis=1)
+        nonZeroYLines = np.any(nEstimate != 0, axis=0) 
+
+        minY_OC = np.argmax(nonZeroXLines)
+        maxY_OC = nEstimate.shape[0] - np.argmax(nonZeroXLines[::-1]) - 1
+        minX_OC = np.argmax(nonZeroYLines)
+        maxX_OC = nEstimate.shape[1] - np.argmax(nonZeroYLines[::-1]) - 1
+        
+        subtract these from the abs vals!
+
+        nEstimate = nEstimate[minY_OC:maxY_OC, minX_OC:maxX_OC]
 
         nGrid = ProbabilityGrid( nAXMin/res, nAXMax/res, nAYMin/res, nAYMax/res, res )
         nGrid.negativeData = nNegative
         nGrid.positiveData = nPositive
         nGrid.mapEstimate  = nEstimate
+
+        plt.figure( 69 )
+        plt.imshow( nEstimate )
+        plt.show( block=False )
 
         return nGrid
 
