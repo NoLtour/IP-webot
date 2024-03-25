@@ -45,7 +45,8 @@ for i in range( 0, len(allScanData) ):
  
         gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
 
-        gridDisp.parseData( nChunk.cachedProbabilityGrid.copyRotated( np.deg2rad( 20 ) ).mapEstimate  ) 
+        #gridDisp.parseData( nChunk.cachedProbabilityGrid.copyRotated( np.deg2rad( 20 ) ).mapEstimate  ) 
+        lpWindow.render()
         lpWindow.render()
 
         chunkStack.append( nChunk )

@@ -89,17 +89,17 @@ class ProbabilityGrid:
         
         
         finalGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
-        
-        for targScan, terminations, noHits in zip(scanStack, scanTerminations, scanNoHits):
+         
+        for targScan, terminations, noHits in zip(scanStack, scanTerminations, scanNoHits): 
             nProbGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
             nProbGrid.addPolyLines( targScan.pose.x - zeroPose.x, targScan.pose.y - zeroPose.y, 
                                terminations[0], terminations[1], noHits  )
             
-            midPointSeperation = np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
+            midPointSeperation = 0*np.sqrt( (targScan.pose.x - middleScan.pose.x)**2 + (targScan.pose.y - middleScan.pose.y)**2  )
             
             if (  midPointSeperation != 0 ):
                 # TODO implement proper uncertainty model!
-                sigma = midPointSeperation*cellRes*3
+                sigma = midPointSeperation*cellRes*1
                 
                 finalGrid.negativeData += convolve2d( nProbGrid.negativeData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
                 finalGrid.positiveData += convolve2d( nProbGrid.positiveData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
@@ -161,7 +161,12 @@ class ProbabilityGrid:
         if ( not onlyRotateEstimate ):
             nNegative = rotate( this.negativeData, np.rad2deg( angle ) )
             nPositive = rotate( this.positiveData, np.rad2deg( angle ) ) 
+            nNegative = np.where( np.abs(nNegative)<0.001, 0, nNegative )
+            nPositive = np.where( np.abs(nPositive)<0.001, 0, nPositive )
  
+        # Rotations leave near zero errors, so I filter them out here
+        nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
+
         nAWidth  = nEstimate.shape[1]
         nAHeight = nEstimate.shape[0]
 
@@ -172,9 +177,9 @@ class ProbabilityGrid:
         nAYMax = nAYMin+nAHeight
 
         res = this.cellRes
-         
-        # Now it trims the output to remove waste
-        nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
+        
+        # TODO finish implementing this optimisation
+        """# Now it trims the output to remove waste
         nonZeroXLines = np.any(nEstimate != 0, axis=1)
         nonZeroYLines = np.any(nEstimate != 0, axis=0) 
 
@@ -185,7 +190,7 @@ class ProbabilityGrid:
         
         subtract these from the abs vals!
 
-        nEstimate = nEstimate[minY_OC:maxY_OC, minX_OC:maxX_OC]
+        nEstimate = nEstimate[minY_OC:maxY_OC, minX_OC:maxX_OC]"""
 
         nGrid = ProbabilityGrid( nAXMin/res, nAXMax/res, nAYMin/res, nAYMax/res, res )
         nGrid.negativeData = nNegative
