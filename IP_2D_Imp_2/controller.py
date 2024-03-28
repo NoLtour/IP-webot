@@ -35,17 +35,7 @@ gridDisp      = lp.LabelledGridGraphDisplay(5,0,5,5, lpWindow, (MAP_PROP.X_MAX-M
 gridDisp2     = lp.LabelledGridGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
  
 _start_millis = -1
-
-def gaussian_kernel(size, sigma=1):
-    """Generates a Gaussian kernel."""
-    kernel = np.fromfunction(
-        lambda x, y: (1/(2*np.pi*sigma**2)) * np.exp(-((x-(size-1)/2)**2 + (y-(size-1)/2)**2)/(2*sigma**2)),
-        (size, size)
-    )
-    return kernel / np.sum(kernel)
-
  
-G_Kernal5 = gaussian_kernel( 5, 2 )
 
 def millis():
     """millis since first robot controller initialisation started"""

@@ -4,7 +4,7 @@ from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree
 from CartesianPose import CartesianPose
 from ProbabilityGrid import ProbabilityGrid
-from CommonLib import gaussian_kernel
+from CommonLib import gaussianKernel
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom

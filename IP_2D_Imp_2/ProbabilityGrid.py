@@ -10,7 +10,7 @@ from scipy.ndimage import rotate
 
 import matplotlib.pyplot as plt
 
-from CommonLib import gaussian_kernel
+from CommonLib import gaussianKernel
 
 class ProbabilityGrid:
     width: int
@@ -101,8 +101,8 @@ class ProbabilityGrid:
                 # TODO implement proper uncertainty model!
                 sigma = midPointSeperation*cellRes*1
                 
-                finalGrid.negativeData += convolve2d( nProbGrid.negativeData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
-                finalGrid.positiveData += convolve2d( nProbGrid.positiveData, gaussian_kernel( 1+int(sigma*2), sigma ), mode="same" )
+                finalGrid.negativeData += convolve2d( nProbGrid.negativeData, gaussianKernel( sigma ), mode="same" )
+                finalGrid.positiveData += convolve2d( nProbGrid.positiveData, gaussianKernel( sigma ), mode="same" )
             else:
                 finalGrid.negativeData += nProbGrid.negativeData
                 finalGrid.positiveData += nProbGrid.positiveData
@@ -211,7 +211,7 @@ class ProbabilityGrid:
 
         """ Uses a model of the environment to partially fill in missing data """
         pixelWidth = estimatedWidth*this.cellRes
-        kern = gaussian_kernel( int(pixelWidth)*2+1, pixelWidth )
+        kern = gaussianKernel( pixelWidth )
         kern /= np.max(kern)
         
         oup = np.maximum(convolve2d( this.positiveData, kern, mode="same" ) - this.negativeData*pixelWidth*sharpnessMult, 0)
