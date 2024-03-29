@@ -13,6 +13,9 @@ print("importing...")
 allScanData = RawScanFrame.importScanFrames( "cleanDataBackup" )
 print("imported")
 
+# Noise step
+for cScan in allScanData:
+    cScan.scanDistances = cScan.scanDistances + 0.01*(np.random.random( cScan.scanDistances.size )-0.5)
 
 config = IPConfig()
 
