@@ -10,7 +10,7 @@ from scipy.ndimage import rotate
 
 import matplotlib.pyplot as plt
 
-from CommonLib import gaussianKernel
+from CommonLib import gaussianKernel, solidCircle,  fancyPlot
 
 class ProbabilityGrid:
     width: int
@@ -207,13 +207,42 @@ class ProbabilityGrid:
         """ Function to fill in object to be more realistic representation of environment """
 
         if ( np.all( this.positiveData == 0 ) ):
-            return - this.negativeData/2 
+            this.mapEstimate = - this.negativeData/2  
 
         """ Uses a model of the environment to partially fill in missing data """
-        pixelWidth = estimatedWidth*this.cellRes
+        pixelWidth = estimatedWidth*this.cellRes 
         kern = gaussianKernel( pixelWidth )
         kern /= np.max(kern)
         
         oup = np.maximum(convolve2d( this.positiveData, kern, mode="same" ) - this.negativeData*pixelWidth*sharpnessMult, 0)
         
         this.mapEstimate = np.minimum( oup/np.max(oup)+this.positiveData, 1 ) - this.negativeData/2
+        
+        
+        
+        oup = np.minimum(1, convolve2d( this.positiveData, solidCircle( int(pixelWidth) ), mode="same" ) )
+        oup = convolve2d( oup, gaussianKernel( pixelWidth/4 ), mode="same" )
+        
+        plt.figure(2)
+        fancyPlot( this.positiveData )
+        plt.figure(3)
+        fancyPlot( this.negativeData )
+        plt.figure(5) 
+        
+        oup = np.minimum(1, convolve2d( this.positiveData, solidCircle( int(pixelWidth) ), mode="same" ) )
+        
+        fancyPlot( oup )
+        plt.figure(6)
+        
+        oup = convolve2d( oup, gaussianKernel( pixelWidth/3 ), mode="same" )
+        fancyPlot( oup )
+        plt.figure(7)
+        
+        oup = np.where( this.negativeData  > oup, 0, oup )
+        fancyPlot( oup )
+        plt.figure(8)
+         
+        fancyPlot( np.maximum( this.positiveData, oup ) - this.negativeData )
+        
+        plt.show()
+        ""
