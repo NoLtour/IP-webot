@@ -504,17 +504,19 @@ class Mapper:
         
         # Extracts the region of intrest from both images
         transWindow = transScan.estimatedMap.copy()[ transLimits[0][1]:transLimits[1][1], transLimits[0][0]:transLimits[1][0] ]
-        refWindow   = refScan.estimatedMap.copy()[ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
+        refWindow   = refScan.estimatedMap.copy()  [ refLimits[0][1]:refLimits[1][1], refLimits[0][0]:refLimits[1][0] ]
         
         mask = ((transWindow!=0) * (refWindow!=0))
         transWindow *= mask
         refWindow   *= mask
         
-        mArea = np.sum(np.abs( transWindow ) + np.abs( refWindow ))
+        #mArea = np.sum(np.abs( transWindow ) + np.abs( refWindow )) # CHANGED I made it multiplative instead of summative
         
         errorWindow = (transWindow*refWindow)
+        mArea = np.sum(np.abs(errorWindow) )
+        
         errorWindow = np.minimum( errorWindow, 0 )
-        errorWindow *= np.abs(errorWindow)
+        #errorWindow *= np.abs(errorWindow) # CHANGED Look into removing this, seems unneeded
         
         errorScore = -1000*np.sum(errorWindow)/mArea
         

@@ -24,10 +24,25 @@ def gaussianKernel(sigma, cutoff=0.02):
         (diam, diam)
     )
     return kernel / np.sum(kernel)
-
+ 
+fplotN = 0
 def fancyPlot( inp ):
+    global fplotN
+    plt.figure(5000+fplotN)
+    fplotN += 1
     y, x = np.meshgrid(np.arange(inp.shape[1]), np.arange(inp.shape[0]))
     plt.imshow( np.ones(inp.shape), cmap="gray", origin="lower", vmin=0, vmax=1 )
     cb = plt.imshow( np.where(inp==0, np.inf, inp), origin="lower" )
     plt.axis("off")
-    plt.colorbar(cb)
+    #plt.colorbar(cb)
+
+
+def generateAngleArray(diameter): 
+    """ generates a 2D array of set diameter  """
+    indices = np.arange(diameter)
+     
+    center = diameter // 2 
+    x, y = np.meshgrid(indices, indices)
+     
+    angle_array = np.arctan2(center - y, center - x)  
+    return angle_array

@@ -5,29 +5,29 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-
-from CommonLib import solid_circle
-
-plt.figure(1)
-plt.imshow( solid_circle( 4  ) ) 
-
-plt.figure(2)
-plt.imshow( solid_circle( 5  ) ) 
-
-plt.figure(3)
-plt.imshow( solid_circle( 7  ) ) 
-
-plt.figure(4)
-plt.imshow( solid_circle( 8  ) ) 
-
-plt.figure(5)
-plt.imshow( solid_circle( 29  ) ) 
-
-plt.figure(5)
-plt.imshow( solid_circle( 2119  ) ) 
-
  
 
+def generate_angle_array(n):
+    # Generate indices for the array
+    indices = np.arange(n)
+    
+    # Compute the center point
+    center = n // 2
+    
+    # Generate a grid of x and y coordinates
+    x, y = np.meshgrid(indices, indices)
+    
+    # Compute the angle between each point and the center
+    angle_array = np.arctan2(center - y, center - x)
+    
+    return angle_array
+
+# Example: Generate a 5x5 array
+n = 105
+angle_array = generate_angle_array(n)
+print(angle_array)
+
+plt.imshow( angle_array )
 plt.show()
 
 ""

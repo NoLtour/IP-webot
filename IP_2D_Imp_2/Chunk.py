@@ -4,11 +4,13 @@ from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree
 from CartesianPose import CartesianPose
 from ProbabilityGrid import ProbabilityGrid
-from CommonLib import gaussianKernel
+from CommonLib import gaussianKernel, fancyPlot
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
+from typing import Union
 import numpy as np
+import matplotlib.pyplot as plt
 
 from IPConfig import IPConfig
 
@@ -114,7 +116,7 @@ class Chunk:
         seperation = np.sqrt( X**2 + Y**2 )
         vecAngle   = np.arctan2( Y, X )- parentCentre.yaw 
 
-        return seperation*np.cos( vecAngle ), seperation*np.sin( vecAngle ), alpha
+        return np.array((seperation*np.cos( vecAngle ), seperation*np.sin( vecAngle ), alpha))
 
     def getRawCentre( this ):
         """ This recursively follows the centres of the chunk until the lowest raw middle scan is found """
@@ -139,34 +141,94 @@ class Chunk:
     def constructProbabilityGrid(this, offset:CartesianPose=-1 ):
         """ used by scan wrapper chunks to return a valid probabilty grid representing the chunk """
         
-        noOffset = offset==-1
+        """noOffset = offset==-1
         if ( noOffset ):
             if ( this.cachedProbabilityGrid != None ):
                 return this.cachedProbabilityGrid 
-            offset = CartesianPose.zero() 
+            offset = CartesianPose.zero() """
         
         if ( this.isScanWrapper ):
             probGrid = ProbabilityGrid.initFromScanFramesPoly( 
                 this.config.GRID_RESOLUTION,
                 this.rawScans,
                 this.centreScanIndex,
-                this.config.MAX_LIDAR_LENGTH,
-                offset
+                this.config.MAX_LIDAR_LENGTH#,
+                #offset
             )
             probGrid.estimateFeatures( this.config.IE_OBJECT_DIAM, this.config.IE_SHARPNESS ) 
             
-            if ( noOffset ):
-                this.cachedProbabilityGrid = probGrid 
+            #if ( noOffset ):
+            this.cachedProbabilityGrid = probGrid 
  
             return probGrid
              
         else:
             ""
+    
+    """ SECTION - chunk comparison """
+
+    def determineErrorFeatureless( this, otherChunk:Chunk ):
+        """ determines the error between two images without using features """
+
+        transOffset = otherChunk.determineInitialOffset()
+        myOffset    = this.determineInitialOffset()
+
+        toTransVector = transOffset - myOffset
+        rotation = toTransVector[2]
+
+        test = this.copyOverlaps( otherChunk, rotation, (toTransVector[0],toTransVector[1]) )
+
+
+    def determineOffsetFeatureless( this, otherChunk:Chunk ):
+        """ determines the offset using image comparison methods instead of feature matching """
+    
+    def copyOverlaps( this, transChunk:Chunk, rotation:float, translation: Union[float, float], onlyMapEstimate=False ):
+        """ 
+            returns a copy of the overlapping region between both grids, it takes inputs in their refrance frames 
+        """
+
+
+        thisProbGrid   = this.cachedProbabilityGrid
+        nTransProbGrid = transChunk.cachedProbabilityGrid.copyTranslated( rotation, translation, True )
         
 
+        cXMin = max( thisProbGrid.xAMin, nTransProbGrid.xAMin ) + 1
+        cXMax = min( thisProbGrid.xAMax, nTransProbGrid.xAMax ) - 1
+        cYMin = max( thisProbGrid.yAMin, nTransProbGrid.yAMin ) + 1
+        cYMax = min( thisProbGrid.yAMax, nTransProbGrid.yAMax ) - 1
 
-    
+        cWidth  = cXMax-cXMin
+        cHeight = cYMax-cYMin
 
+        thisLCXMin, thisLCYMin = cXMin-thisProbGrid.xAMin, cYMin-thisProbGrid.yAMin
+        transLCXMin, transLCYMin = cXMin-nTransProbGrid.xAMin, cYMin-nTransProbGrid.yAMin
+
+        thisWindow  = thisProbGrid.mapEstimate[ thisLCXMin:thisLCXMin+cWidth, thisLCYMin:thisLCYMin+cHeight ]
+        transWindow = nTransProbGrid.mapEstimate[ transLCXMin:transLCXMin+cWidth, transLCYMin:transLCYMin+cHeight ]
+
+        #fancyPlot( this.cachedProbabilityGrid.mapEstimate )
+        #fancyPlot( nTransProbGrid.mapEstimate )
+        
+        plt.figure(45)
+        plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
+        plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
+        #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
+        
+        plt.figure(46)
+        plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
+        plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
+        #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )
+        
+        fancyPlot( thisWindow )
+        fancyPlot( transWindow )
+        
+        
+        
+        #fancyPlot( thisWindow-transWindow )
+
+        plt.show(block=False)
+
+        ""
 
 
 

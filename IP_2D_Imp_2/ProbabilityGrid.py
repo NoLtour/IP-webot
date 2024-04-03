@@ -1,4 +1,6 @@
- 
+from __future__ import annotations
+
+from typing import Union
 import numpy as np
 from dataclasses import dataclass, field
 from scipy.signal import convolve2d
@@ -11,6 +13,14 @@ from scipy.ndimage import rotate
 import matplotlib.pyplot as plt
 
 from CommonLib import gaussianKernel, solidCircle,  fancyPlot
+
+"""
+ A key property of probability grids is that the observation point exists at (0,0). This is approximately true for grids constructed from
+ consecutive scans with small changes between them. In the case where the grids constructed from a large number of scattered scans this
+ is no longer the case as doing so becomes impossible with the scan centres being too different. They also hold no rotation
+ 
+ Grids constructed from copying may have non zero rotation or translation for the purposes of frame comparison
+"""
 
 class ProbabilityGrid:
     width: int
@@ -43,14 +53,14 @@ class ProbabilityGrid:
         this.yAMin = int(yMin*cellRes)
         this.yAMax = int(yMax*cellRes)
         
-        this.width = int((xMax - xMin)*cellRes)
-        this.height = int((yMax - yMin)*cellRes) 
+        this.width = this.xAMax - this.xAMin
+        this.height = this.yAMax - this.yAMin
         
         this.negativeData = np.zeros( (this.height, this.width) )
         this.positiveData = np.zeros( (this.height, this.width) )
     
     @staticmethod 
-    def initFromScanFramesPoly( cellRes:float, scanStack:list[RawScanFrame], midScanIndex, maxScanDistance:float, offsetPose:CartesianPose=CartesianPose.zero() ):
+    def initFromScanFramesPoly( cellRes:float, scanStack:list[RawScanFrame], midScanIndex, maxScanDistance:float ):
         """
             Constructs a scene by creating an image of negative space consisiting of area covered within linecasts, then constructs positive space
             consisting of line segmants connecting nearby hits
@@ -64,8 +74,8 @@ class ProbabilityGrid:
 
         middleScan = scanStack[midScanIndex] 
         
+        # The zeropose becomes the origin of the constructed probability grid, it exists at zero, zero
         zeroPose = middleScan.pose.copy()
-        zeroPose.subtractPose( offsetPose )
         
         scanTerminations = []
         scanNoHits       = []
@@ -148,35 +158,57 @@ class ProbabilityGrid:
         #                    observation region masked by where objects don't exist
         this.negativeData += observationRegion * (interceptionRegion==0)
 
-    def copyRotated( this, angle, onlyRotateEstimate=False ):
-        """ returns a new probability grid which is this but rotated by angle """
+    def copyTranslated( this, angle, translation, onlyRotateEstimate=False ):
+        """ returns a new probability grid which is this but rotated by angle, translation is applied before rotation.
+         the rotation is done about this probability grids 0,0 which lines up with the centre of observation
+           """
 
-        AXCentre = (this.xAMin+this.xAMax)*0.5
-        AYCentre = (this.yAMin+this.yAMax)*0.5
+        """AXCentre = (this.xAMin+this.xAMax)*0.5 + translation[0]
+        AYCentre = (this.yAMin+this.yAMax)*0.5 + translation[1]"""
+        # Vector from origin to image centre
+        aCentreVector = np.array([this.width/2- -this.xAMin, this.height/2- -this.yAMin])
+
+        # Rotating the centre vector means we can find the origin after rotation
+        rotationMatrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                 [np.sin(angle), np.cos(angle)]])
+        nACentreVector = np.dot(rotationMatrix, aCentreVector)
 
         nNegative = None
         nPositive = None
-        nEstimate = rotate( this.mapEstimate, np.rad2deg( angle ) ) 
+
+        nEstimate = rotate( this.mapEstimate, np.rad2deg( -angle ) ) 
+        # Rotations leave near zero errors, so I filter them out here
+        nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
 
         if ( not onlyRotateEstimate ):
             nNegative = rotate( this.negativeData, np.rad2deg( angle ) )
             nPositive = rotate( this.positiveData, np.rad2deg( angle ) ) 
             nNegative = np.where( np.abs(nNegative)<0.001, 0, nNegative )
             nPositive = np.where( np.abs(nPositive)<0.001, 0, nPositive )
- 
-        # Rotations leave near zero errors, so I filter them out here
-        nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
+
+        
 
         nAWidth  = nEstimate.shape[1]
         nAHeight = nEstimate.shape[0]
 
-        nAXMin = int(AXCentre-nAWidth*0.5)
+        nAXMin = int(nACentreVector[0]-nAWidth*0.5  + translation[0]*this.cellRes)
         nAXMax = nAXMin+nAWidth
 
-        nAYMin = int(AYCentre-nAHeight*0.5)
+        nAYMin = int(nACentreVector[1]-nAHeight*0.5 + translation[1]*this.cellRes)
         nAYMax = nAYMin+nAHeight
 
         res = this.cellRes
+
+        """plt.figure(453)
+        plt.imshow( this.mapEstimate, origin="lower" )
+        plt.plot( [-this.xAMin, aCentreVector[0]-this.xAMin, aCentreVector[0]-nACentreVector[0]-this.xAMin], [-this.yAMin, aCentreVector[1]-this.yAMin, aCentreVector[1]-nACentreVector[1]-this.yAMin], "rx" )
+        #plt.plot( [-this.xAMin ], [-this.yAMin ], "rx" )
+
+        plt.figure(45)
+        plt.imshow( nEstimate, origin="lower" )
+        plt.plot( [-nAXMin], [-nAYMin], "rx"  )
+
+        plt.show(block=False)"""
         
         # TODO finish implementing this optimisation
         """# Now it trims the output to remove waste
@@ -197,9 +229,9 @@ class ProbabilityGrid:
         nGrid.positiveData = nPositive
         nGrid.mapEstimate  = nEstimate
 
-        plt.figure( 69 )
+        """plt.figure( 69 )
         plt.imshow( nEstimate )
-        plt.show( block=False )
+        plt.show( block=False )"""
 
         return nGrid
 
@@ -222,28 +254,24 @@ class ProbabilityGrid:
         
         oup = np.minimum(1, convolve2d( this.positiveData, solidCircle( int(pixelWidth) ), mode="same" ) )
         oup = convolve2d( oup, gaussianKernel( pixelWidth/4 ), mode="same" )"""
-        
-        """plt.figure(2)
-        fancyPlot( this.positiveData )
-        plt.figure(3)
-        fancyPlot( this.negativeData )
-        plt.figure(5)""" 
+         
+        #fancyPlot( this.positiveData ) 
+        #fancyPlot( this.negativeData ) 
         
         oup = convolve2d( this.positiveData, solidCircle( int(pixelWidth) ), mode="same" ) 
         
-        """fancyPlot( oup )
-        plt.figure(6)"""
+        #fancyPlot( oup ) 
         
         oup = convolve2d( oup, gaussianKernel( pixelWidth/3, 0.1 ), mode="same" )
-        """fancyPlot( oup )
-        plt.figure(7)"""
+        #fancyPlot( oup )
         
         oup = np.where( this.negativeData*sharpnessMult  > oup, 0, oup )
-        """fancyPlot( oup )
-        plt.figure(8)
+        #fancyPlot( oup ) 
          
-        fancyPlot( np.maximum( this.positiveData, oup ) - this.negativeData )
-        
-        plt.show()""" 
-
         this.mapEstimate = np.minimum( np.maximum( this.positiveData, oup ), 1  ) - this.negativeData
+        #fancyPlot(  this.mapEstimate )
+        
+        #plt.show()
+
+
+        

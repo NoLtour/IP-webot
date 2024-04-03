@@ -16,6 +16,7 @@ print("imported")
 # Noise step
 for cScan in allScanData:
     cScan.scanDistances = cScan.scanDistances + 0.01*(np.random.random( cScan.scanDistances.size )-0.5)
+    cScan.pose = cScan.truePose # TODO remove
 
 config = IPConfig()
 
@@ -47,16 +48,23 @@ for i in range( 0, len(allScanData) ):
         nChunk.constructProbabilityGrid() 
  
         gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
+        
+        #hardEstimate = np.where( nChunk.cachedProbabilityGrid.mapEstimate<-0.3, -1, 0 ) + np.where( nChunk.cachedProbabilityGrid.mapEstimate>0.3, 1, 0 )
+       
+        #gridDisp.parseData(hardEstimate  ) 
 
         #gridDisp.parseData( nChunk.cachedProbabilityGrid.copyRotated( np.deg2rad( 20 ) ).mapEstimate  ) 
-        lpWindow.render() 
+        lpWindow.render()  
 
         chunkStack.append( nChunk )
     
-    if ( len( chunkStack ) > 5 ):
+    if ( len( chunkStack ) > 36 ):
         parentChunk = Chunk.initEmpty( config )
 
         parentChunk.addChunks( chunkStack )
+
+        chunkStack[0].determineErrorFeatureless( chunkStack[35] )
+
         chunkStack = []
 
 
