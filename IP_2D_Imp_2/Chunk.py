@@ -203,8 +203,8 @@ class Chunk:
         thisLCXMin, thisLCYMin = cXMin-thisProbGrid.xAMin, cYMin-thisProbGrid.yAMin
         transLCXMin, transLCYMin = cXMin-nTransProbGrid.xAMin, cYMin-nTransProbGrid.yAMin
 
-        thisWindow  = thisProbGrid.mapEstimate[ thisLCXMin:thisLCXMin+cWidth, thisLCYMin:thisLCYMin+cHeight ]
-        transWindow = nTransProbGrid.mapEstimate[ transLCXMin:transLCXMin+cWidth, transLCYMin:transLCYMin+cHeight ]
+        thisWindow  = thisProbGrid.mapEstimate[ thisLCYMin:thisLCYMin+cHeight, thisLCXMin:thisLCXMin+cWidth ]
+        transWindow = nTransProbGrid.mapEstimate[ transLCYMin:transLCYMin+cHeight, transLCXMin:transLCXMin+cWidth ]
 
         #fancyPlot( this.cachedProbabilityGrid.mapEstimate )
         #fancyPlot( nTransProbGrid.mapEstimate )
@@ -224,7 +224,7 @@ class Chunk:
         
         
         
-        #fancyPlot( thisWindow-transWindow )
+        fancyPlot( thisWindow-transWindow )
 
         plt.show(block=False)
 
