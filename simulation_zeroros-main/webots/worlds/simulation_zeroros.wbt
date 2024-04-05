@@ -30,7 +30,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.005398042650515628 0.9999705508825947 0.005455135479832842 1.5608286177774473
-  position 0.8446099029795104 1.3221974788200093 6.783248444709514
+  position 0.8022928673684918 1.321728502705357 11.016267653440188
   follow "MyBot"
 }
 TexturedBackground {
@@ -442,7 +442,7 @@ DEF ROBOT Robot {
       ]
       rotationStep 0.261799
       horizontalResolution 128
-      fieldOfView 1.57
+      fieldOfView 3.12
       numberOfLayers 1
       near 0.05
       minRange 0.05

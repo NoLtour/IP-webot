@@ -10,6 +10,14 @@ class IPConfig:
     MAX_FRAMES_MERGE = 8
     MAX_INTER_FRAME_ANGLE = np.rad2deg(2220)
 
+    # Featureless adjuster
+    FEATURELESS_SEARCH_DIST = 0.14 # Given in generic distance
+    FEATURELESS_PIX_SEARCH_DIAM = int(GRID_RESOLUTION*FEATURELESS_SEARCH_DIST*2+1)
+    FEATURELESS_X_ERROR_SCALE   = 0.06
+    FEATURELESS_Y_ERROR_SCALE   = 0.035
+    FEATURELESS_A_ERROR_SCALE   = 0.05#0.06
+    FEATURELESS_COMP_FACT       = 0.5
+
     # Scan propreties
     MAX_LIDAR_LENGTH = 8
 

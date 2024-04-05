@@ -4,7 +4,7 @@ from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree
 from CartesianPose import CartesianPose
 from ProbabilityGrid import ProbabilityGrid
-from CommonLib import gaussianKernel, fancyPlot
+from CommonLib import gaussianKernel, fancyPlot, solidCircle
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
@@ -167,17 +167,123 @@ class Chunk:
     
     """ SECTION - chunk comparison """
 
-    def determineErrorFeatureless( this, otherChunk:Chunk ):
+    def determineErrorFeatureless( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
+        """ estimates the poitional error between two images without using features """
+
+        transOffset = otherChunk.determineInitialOffset()
+        myOffset    = this.determineInitialOffset()
+
+        toTransVector = transOffset - myOffset
+
+        toTransVector += forcedOffset
+
+        # Overlap is extracted
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+
+        # First the search region is defined
+        searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
+        intrestMask = (convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
+        
+        errorWindow = (thisWindow - transWindow) *intrestMask *np.abs(thisWindow * transWindow)
+
+        """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
+        #fancyPlot( nTransProbGrid.mapEstimate )
+        
+        plt.figure(45)
+        plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
+        plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
+        #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
+        
+        plt.figure(46)
+        plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
+        plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
+        #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )"""
+        
+        kernal = gaussianKernel( 1 )
+         
+        erDy, erDx = np.gradient( errorWindow )
+        #erDy = convolve2d( erDy, kernal, mode="same" ) *(thisWindow<0)
+        #erDx = convolve2d( erDx, kernal, mode="same" ) 
+        
+        # Imperical adjustments made to make final errors more accurate
+        erDy = this.config.FEATURELESS_Y_ERROR_SCALE*(thisWindow<0)*erDy#*convolve2d( erDy, kernal, mode="same" ) 
+        erDx = this.config.FEATURELESS_X_ERROR_SCALE*(thisWindow<0)*erDx#*convolve2d( erDx, kernal, mode="same" )  
+
+        # Length scale keeps errors consistantly sized
+        lengthScale = np.sqrt(np.sum(transWindow*(transWindow>0)))
+        yError = np.sum(erDy)/lengthScale
+        xError = np.sum(erDx)/lengthScale 
+
+        rows, cols = errorWindow.shape  
+        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+        origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
+        x_offset = (x_coords - origin[0])
+        y_offset = (y_coords - origin[1]) 
+
+        # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
+        sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
+        x_tangential_vector = y_offset/sepLen
+        y_tangential_vector = -x_offset/sepLen 
+
+        angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)/lengthScale
+        angleError *= this.config.FEATURELESS_A_ERROR_SCALE
+
+        # Reduce coupling effect
+        xCompensation = (1-np.cos(angleError))
+        yCompensation = (np.sin(angleError))
+        aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
+
+        #xError     -= xCompensation*this.config.FEATURELESS_COMP_FACT
+        #yError     -= yCompensation*this.config.FEATURELESS_COMP_FACT
+        angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
+
+        errorWindow *= thisWindow<0
+        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+
+        if ( showPlot ):
+            #fancyPlot( thisWindow )
+            #fancyPlot( transWindow )
+             
+            fancyPlot( sepLen )
+            fancyPlot( x_tangential_vector )
+            fancyPlot( y_tangential_vector )
+            
+            fancyPlot( x_tangential_vector*erDx )
+            fancyPlot( y_tangential_vector*erDy )
+            
+            fancyPlot( errorWindow )
+            fancyPlot( thisWindow-transWindow )
+            fancyPlot( intrestMask )
+
+            plt.show(block=False)
+ 
+
+        return xError, yError, angleError 
+
+    def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
         """ determines the error between two images without using features """
 
         transOffset = otherChunk.determineInitialOffset()
         myOffset    = this.determineInitialOffset()
 
         toTransVector = transOffset - myOffset
-        rotation = toTransVector[2]
 
-        test = this.copyOverlaps( otherChunk, rotation, (toTransVector[0],toTransVector[1]) )
+        toTransVector += forcedOffset
 
+        # Overlap is extracted
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+  
+        errorWindow = (thisWindow*transWindow)
+        mArea = np.sum(np.abs(errorWindow) ) 
+
+        errorWindow = -np.minimum( errorWindow, 0 ) 
+
+        errorScore = 1000*np.sum(errorWindow)/mArea
+ 
+
+        return errorScore, mArea
+
+        
 
     def determineOffsetFeatureless( this, otherChunk:Chunk ):
         """ determines the offset using image comparison methods instead of feature matching """
@@ -206,29 +312,7 @@ class Chunk:
         thisWindow  = thisProbGrid.mapEstimate[ thisLCYMin:thisLCYMin+cHeight, thisLCXMin:thisLCXMin+cWidth ]
         transWindow = nTransProbGrid.mapEstimate[ transLCYMin:transLCYMin+cHeight, transLCXMin:transLCXMin+cWidth ]
 
-        #fancyPlot( this.cachedProbabilityGrid.mapEstimate )
-        #fancyPlot( nTransProbGrid.mapEstimate )
-        
-        plt.figure(45)
-        plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
-        #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
-        
-        plt.figure(46)
-        plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
-        #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )
-        
-        fancyPlot( thisWindow )
-        fancyPlot( transWindow )
-        
-        
-        
-        fancyPlot( thisWindow-transWindow )
-
-        plt.show(block=False)
-
-        ""
+        return thisWindow, transWindow
 
 
 
