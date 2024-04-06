@@ -12,6 +12,7 @@ from Chunk import Chunk
  
 from scipy.interpolate import RBFInterpolator 
 from scipy.optimize import minimize
+from scipy.optimize import differential_evolution
 
 from CommonLib import fancyPlot
 
@@ -117,8 +118,7 @@ def featurelessFullTest( inpChunk ):
     plt.legend()
     plt.xlabel("input error (rad)")
     plt.ylabel("compensation undershoot")
-    
-    plt.show()
+     
     """plt.figure(36)
     plt.plot( yInErrors, yInErrors-yPrErrors )
     plt.xlabel("input error")
@@ -216,7 +216,7 @@ def findDifference( inpChunk1, inpChunk2, initOffset, maxIterations, showGraph=F
     errorScore, overlapArea = inpChunk1.determineDirectDifference( inpChunk2, trueOffset )
     print("!e:",errorScore,"   x:", trueOffset[0],"   y:", trueOffset[1],"   a:", trueOffset[2])"""
 
-    return offsets[errors.size-1], errors[errors.size-1], errors.size-1
+    return offsets[cMinIndex], errors[cMinIndex], errors.size-1
 
 def findDifference2( inpChunk1, inpChunk2, initOffset, maxIterations ):
     trueOffset = initOffset
@@ -243,14 +243,17 @@ def superTuner( inpChunk ):
     featurelessAutoTune( inpChunk )
     
     conf = inpChunk.config
-    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01040241, 0.01857013, 0.0087708,  0.06650539
-
+    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01194487, 0.00555347, 0.00045558, 0.07988497
+    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01897726, 0.00751112 ,0.00136641 ,0.11150678
+    #avg: 19.87302725899315 fails: 0  Set: [0.03100083 0.00930756 0.00110901 0.20546921]
+    #avg: 18.42025281767809 fails: 0  Set: [0.03089128 0.00952647 0.0011058  0.20442749]
+    
     xScale = inpChunk.config.FEATURELESS_X_ERROR_SCALE 
     yScale = inpChunk.config.FEATURELESS_Y_ERROR_SCALE 
     aScale = inpChunk.config.FEATURELESS_A_ERROR_SCALE 
     aThr   = inpChunk.config.ANGLE_OVERWIRTE_THRESHOLD
 
-    testInputs = genTestingSets( (-0.25,0.25,0.025),(-0.25,0.25,0.025),(np.deg2rad(-16),np.deg2rad(16),np.deg2rad(0.7)), 15 )
+    testInputs = genTestingSets( (-0.25,0.25,0.025),(-0.25,0.25,0.025),(np.deg2rad(-16),np.deg2rad(16),np.deg2rad(0.7)), 50 )
     testInputs.append((0.01,0.01,0.01)) 
     
     def testAll( settings ):
@@ -259,27 +262,32 @@ def superTuner( inpChunk ):
         inpChunk.config.FEATURELESS_A_ERROR_SCALE = settings[2]
         inpChunk.config.ANGLE_OVERWIRTE_THRESHOLD = settings[3]
 
-        erVals = []
-        fails  = 0
-        for testVals in testInputs:
-            foundOffset, minError, successes = findDifference( inpChunk, inpChunk, testVals, 9 )
-            if ( np.isnan(minError) ):break
-            erVals.append( (13-successes)*((minError)**2) )
-            fails += (10-successes)
+        try:
+            erVals = []
+            fails  = 0
+            for testVals in testInputs:
+                foundOffset, minError, successes = findDifference( inpChunk, inpChunk, testVals, 8 )
+                if ( np.isnan(minError) ):break
+                erVals.append( ((minError)**2) )
+                fails += (8 -successes)
 
-        if ( len(erVals)== 0 ):
-            print("fail:" ," Set:",settings)
-            return 1000
-        
-        avrg = np.sqrt(np.average(np.array(erVals)))
-        print("avg:",avrg,"fails:",fails," Set:",settings)
-        
-        return avrg  
+            if ( len(erVals)== 0 ):
+                print("fail:" ," Set:",settings)
+                return 1000
+            
+            avrg = np.sqrt(np.average(np.array(erVals)))
+            print("avg:",avrg,"fails:",fails," Set:",settings)
+            
+            return avrg  
+        except:
+            print("critical error")
+            return 10000
 
-    startingScore = testAll( [xScale, yScale, aScale, aThr] )
+    #startingScore = testAll( [xScale, yScale, aScale, aThr] )
 
     #findDifference( inpChunk, inpChunk, testInputs[0] )
-    result = minimize( testAll, np.array([xScale, yScale, aScale, aThr]),  method="COBYLA", options={"rhobeg":np.array([xScale, yScale, aScale, aThr])*0.9,'maxiter':160} )
+    #result = minimize( testAll, np.array([xScale, yScale, aScale, aThr]),  method="COBYLA", options={"rhobeg":np.array([xScale, yScale, aScale, aThr])*0.9,'maxiter':160} )
+    result = differential_evolution( testAll, [(xScale*0.1,xScale*3), (yScale*0.1,yScale*3), (aScale*0.1,aScale*3), (aThr*0.1,aThr*3)], x0=np.array([xScale, yScale, aScale, aThr]) )
 
     conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = result.x[0], result.x[1], result.x[2], result.x[3]
 
@@ -323,13 +331,13 @@ for i in range( 0, len(allScanData) ):
 
         parentChunk.addChunks( chunkStack )
 
-        #superTuner( chunkStack[32] )
+        superTuner( chunkStack[32] )
         #featurelessAutoTune( chunkStack[32]  )
         
         conf = chunkStack[32].config
-        conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01247666 ,0.01801388 ,0.00037403 ,0.06981317
+        conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.03089128 ,0.00952647, 0.0011058  ,0.20442749
 
-        offset, error, val = findDifference( chunkStack[32],chunkStack[32], (0.1, 0.17, np.deg2rad(8)), 40, True ) 
+        offset, error, val = findDifference( chunkStack[32],chunkStack[32], (0, 0, np.deg2rad(15)), 40, True ) 
         #featurelessFullTest( chunkStack[32] )
 
         chunkStack = []
