@@ -188,10 +188,8 @@ class Chunk:
         errorWindow = (thisWindow - transWindow) * intrestMask*np.abs(thisWindow * transWindow)
 
         conflictWindow = (thisWindow*transWindow*intrestMask)
-        mArea = np.sum(np.abs(conflictWindow) )  
-        if ( mArea==0 ): return 0,0,0
+        
         conflictWindow = -np.minimum( conflictWindow, 0 )  
-        conflictMultiplier = 10 + 1000*np.sum(conflictWindow)/mArea
 
 
         """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
@@ -216,7 +214,8 @@ class Chunk:
         #lengthScale = np.sum(np.abs(erDy))+np.sum(np.abs(erDx))
         lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
         if ( lengthScale==0 ): return 0,0,0
-        conflictMultiplier /= lengthScale
+        conflictMultiplier = 1 + this.config.CONFLICT_MULT_GAIN*np.sum(conflictWindow)/lengthScale
+        
         #conflictMultiplier = 1
         
         """fancyPlot( errorWindow )
@@ -268,9 +267,9 @@ class Chunk:
         xError *= conflictMultiplier
         yError *= conflictMultiplier
 
-        if ( abs(angleError) > this.config.ANGLE_OVERWIRTE_THRESHOLD ):
+        """if ( abs(angleError) > this.config.ANGLE_OVERWIRTE_THRESHOLD ):
             xError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError
-            yError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError
+            yError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError"""
 
         #aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
         #angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
@@ -412,7 +411,41 @@ class Chunk:
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
-  
+
+        thisPositive = thisWindow>0
+        thisWindow = np.where( thisPositive, thisWindow*10, thisWindow )
+        #posThisWin = np.where( thisWindow>0, thisWindow, 0 )
+        #posTransWin = np.where( transWindow>0, thisWindow, 0 )
+
+        #possibleOverlap = min( np.sum(posThisWin), np.sum(posTransWin) )
+
+        errorWindow = (thisWindow*transWindow)
+        #mArea = np.sum(np.abs(errorWindow) ) 
+        mArea = np.sum(np.abs(thisPositive*errorWindow) ) 
+        
+        #if (mArea<10): return np.nan, np.nan
+
+        errorWindow = -np.minimum( errorWindow, 0 ) 
+
+        errorScore = 1000*np.sum(errorWindow)/mArea
+
+        return errorScore, mArea
+
+        
+    def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
+        """ determines the error between two images without using features """
+
+        transOffset = otherChunk.determineInitialOffset()
+        myOffset    = this.determineInitialOffset()
+
+        toTransVector = transOffset - myOffset
+
+        toTransVector += forcedOffset
+
+        # Overlap is extracted
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+ 
+
         errorWindow = (thisWindow*transWindow)
         mArea = np.sum(np.abs(errorWindow) ) 
         if (mArea<10): return np.nan, np.nan
@@ -420,11 +453,14 @@ class Chunk:
         errorWindow = -np.minimum( errorWindow, 0 ) 
 
         errorScore = 1000*np.sum(errorWindow)/mArea
- 
+
+        fancyPlot( thisWindow )
+        fancyPlot( transWindow )
+        fancyPlot( errorWindow )
+        fancyPlot( thisWindow-transWindow )
+        plt.show()
 
         return errorScore, mArea
-
-        
 
     def determineOffsetFeatureless( this, otherChunk:Chunk ):
         """ determines the offset using image comparison methods instead of feature matching """

@@ -18,6 +18,7 @@ class IPConfig:
     FEATURELESS_A_ERROR_SCALE   = 16#0.06
     FEATURELESS_COMP_FACT       = 0
     ANGLE_OVERWIRTE_THRESHOLD   = np.deg2rad( 4 )
+    CONFLICT_MULT_GAIN          = 0.5
 
     # Scan propreties
     MAX_LIDAR_LENGTH = 8

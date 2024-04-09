@@ -126,7 +126,7 @@ def featurelessFullTest( inpChunk ):
 
     plt.show()
 
-def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(10) ):
+def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(7) ):
     inpChunk.config.FEATURELESS_X_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_Y_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_A_ERROR_SCALE = 0
@@ -228,48 +228,55 @@ def findDifference2( inpChunk1, inpChunk2, initOffset, maxIterations ):
 
 
     def interpFunc( offsets ):
-        return inpChunk1.determineDirectDifference( inpChunk2, offsets )[0]
+        error, area = inpChunk1.determineDirectDifference( inpChunk2, offsets )
 
-    calcOffset = np.array(inpChunk1.determineErrorFeatureless( inpChunk2, trueOffset, False )) 
+        if (np.isnan(error)):
+            return 1000
+        
+        return error
 
-    nm = minimize( interpFunc, np.array(trueOffset),  method="COBYLA", options={"rhobeg":calcOffset} )
+    #calcOffset = np.array(inpChunk1.determineErrorFeatureless2( inpChunk2, trueOffset, False )) 
+
+    nm = minimize( interpFunc, np.array(trueOffset),  method="COBYLA", options={ 'maxiter': maxIterations} )
  
     trueOffset = ( nm.x[0], nm.x[1], nm.x[2] ) 
     errorScore, overlapArea = inpChunk1.determineDirectDifference( inpChunk2, trueOffset ) 
+    #inpChunk1.plotDifference( inpChunk2, trueOffset ) 
 
-    return trueOffset, errorScore
+    return trueOffset, errorScore, 1
 
-def superTuner( inpChunk ):
+def superTuner( inpChunk, scenarioCount=40, searchCount=5 ):
     featurelessAutoTune( inpChunk )
     
     conf = inpChunk.config
-    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01194487, 0.00555347, 0.00045558, 0.07988497
-    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.01897726, 0.00751112 ,0.00136641 ,0.11150678
+    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.CONFLICT_MULT_GAIN = 0.01194487, 0.00555347, 0.00045558, 0.07988497
+    #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.CONFLICT_MULT_GAIN = 0.01897726, 0.00751112 ,0.00136641 ,0.11150678
     #avg: 19.87302725899315 fails: 0  Set: [0.03100083 0.00930756 0.00110901 0.20546921]
     #avg: 18.42025281767809 fails: 0  Set: [0.03089128 0.00952647 0.0011058  0.20442749]
     
     xScale = inpChunk.config.FEATURELESS_X_ERROR_SCALE 
     yScale = inpChunk.config.FEATURELESS_Y_ERROR_SCALE 
     aScale = inpChunk.config.FEATURELESS_A_ERROR_SCALE 
-    aThr   = inpChunk.config.ANGLE_OVERWIRTE_THRESHOLD
+    aThr   = inpChunk.config.CONFLICT_MULT_GAIN
 
-    testInputs = genTestingSets( (-0.25,0.25,0.025),(-0.25,0.25,0.025),(np.deg2rad(-16),np.deg2rad(16),np.deg2rad(0.7)), 50 )
+    testInputs = genTestingSets( (-0.25,0.25,0.025),(-0.25,0.25,0.025),(np.deg2rad(-16),np.deg2rad(16),np.deg2rad(0.7)), scenarioCount )
     testInputs.append((0.01,0.01,0.01)) 
     
     def testAll( settings ):
         inpChunk.config.FEATURELESS_X_ERROR_SCALE = settings[0]
         inpChunk.config.FEATURELESS_Y_ERROR_SCALE = settings[1]
         inpChunk.config.FEATURELESS_A_ERROR_SCALE = settings[2]
-        inpChunk.config.ANGLE_OVERWIRTE_THRESHOLD = settings[3]
+        inpChunk.config.CONFLICT_MULT_GAIN = settings[3]
 
         try:
             erVals = []
             fails  = 0
             for testVals in testInputs:
-                foundOffset, minError, successes = findDifference( inpChunk, inpChunk, testVals, 8 )
+                foundOffset, minError, successes = findDifference( inpChunk, inpChunk, testVals, searchCount )
+                minError = (foundOffset[0]**2+foundOffset[1]**2+foundOffset[2]**2)
                 if ( np.isnan(minError) ):break
                 erVals.append( ((minError)**2) )
-                fails += (8 -successes)
+                fails += (searchCount -successes)
 
             if ( len(erVals)== 0 ):
                 print("fail:" ," Set:",settings)
@@ -286,16 +293,137 @@ def superTuner( inpChunk ):
     #startingScore = testAll( [xScale, yScale, aScale, aThr] )
 
     #findDifference( inpChunk, inpChunk, testInputs[0] )
-    #result = minimize( testAll, np.array([xScale, yScale, aScale, aThr]),  method="COBYLA", options={"rhobeg":np.array([xScale, yScale, aScale, aThr])*0.9,'maxiter':160} )
+    #result = minimize( testAll, np.array([xScale, yScale, aScale, aThr]),  method="COBYLA", options={"rhobeg":np.array([xScale, yScale, aScale, aThr])*0.9,'maxiter':30} )
     result = differential_evolution( testAll, [(xScale*0.1,xScale*3), (yScale*0.1,yScale*3), (aScale*0.1,aScale*3), (aThr*0.1,aThr*3)], x0=np.array([xScale, yScale, aScale, aThr]) )
 
-    conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = result.x[0], result.x[1], result.x[2], result.x[3]
+    conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.CONFLICT_MULT_GAIN = result.x[0], result.x[1], result.x[2], result.x[3]
 
     print(result.x)
 
     featurelessFullTest( inpChunk )
 
     ""
+
+def errorTester( inpChunk ):   
+    xOffsets = np.arange( -0.35, 0.35, 0.025 )
+    yOffsets = np.arange( -0.35, 0.35, 0.025 )
+
+    yO, xO = np.meshgrid( xOffsets, yOffsets )
+    rO = np.zeros( xO.shape )
+
+    offsetTests = np.column_stack( (xO.flatten(), yO.flatten(), rO.flatten()) )
+    offsetErrors = []
+
+    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.25 ))
+    rotationErrors = []
+
+    for offsetTest in offsetTests:
+        errorScore, overlapArea = inpChunk.determineDirectDifference( inpChunk, offsetTest )
+        offsetErrors.append( errorScore )
+
+    for rotationTest in rotationTests:
+        errorScore, overlapArea = inpChunk.determineDirectDifference( inpChunk, np.array( (0,0,rotationTest) ) )
+        rotationErrors.append( errorScore )
+
+    plt.figure(1512)
+    """plt.xticks(np.arange( -0.3, 0.3, 0.1 ))
+    plt.yticks(np.arange( -0.3, 0.3, 0.1 ))"""
+    bar = plt.imshow(np.array( offsetErrors ).reshape( xO.shape ), extent=[np.min(xOffsets), np.max(xOffsets), np.min(yOffsets), np.max(yOffsets)]) 
+    plt.colorbar( bar )
+    plt.title("error function output for known displacement error")
+    plt.xlabel("x displacement error")
+    plt.ylabel("y displacement error")
+
+    plt.figure(1514)
+    plt.plot( np.rad2deg(rotationTests), np.array(rotationErrors) )
+    plt.title("error function output for known rotational error")
+    plt.xlabel("rotation error (deg)")
+    plt.ylabel("error score")
+    plt.show()
+
+    "4"
+  
+def method1Tester( inpChunk ):   
+    xOffsets = np.arange( -0.35, 0.35, 0.04 )
+    yOffsets = np.arange( -0.35, 0.35, 0.04 )
+
+    yO, xO = np.meshgrid( xOffsets, yOffsets )
+    rO = np.zeros( xO.shape )
+
+    offsetTests = np.column_stack( (xO.flatten(), yO.flatten(), rO.flatten()) )
+    offsetErrors = []
+
+    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.5 ))
+    rotationErrors = []
+
+    for offsetTest in offsetTests:
+        initialError, overlapArea = inpChunk.determineDirectDifference( inpChunk, offsetTest )
+        predError, newError, v = findDifference( inpChunk, inpChunk, offsetTest, 6 )
+        offsetErrors.append( -100*(newError-initialError)/initialError ) 
+
+    for rotationTest in rotationTests: 
+        initialError, overlapArea = inpChunk.determineDirectDifference( inpChunk, np.array( (0,0,rotationTest) ) )
+        predError, newError, v = findDifference( inpChunk, inpChunk, np.array( (0,0,rotationTest) ), 6 )
+        rotationErrors.append( -100*(newError-initialError)/initialError ) 
+
+    plt.figure(1512)
+    """plt.xticks(np.arange( -0.3, 0.3, 0.1 ))
+    plt.yticks(np.arange( -0.3, 0.3, 0.1 ))"""
+    bar = plt.imshow(np.array( offsetErrors ).reshape( xO.shape ), extent=[np.min(xOffsets), np.max(xOffsets), np.min(yOffsets), np.max(yOffsets)]) 
+    plt.colorbar( bar )
+    plt.title("Percentage error reduction")
+    plt.xlabel("x displacement error")
+    plt.ylabel("y displacement error")
+
+    plt.figure(1514)
+    plt.plot( np.rad2deg(rotationTests), np.array(rotationErrors) )
+    plt.title("Percentage error reduction")
+    plt.xlabel("rotation error (deg)")
+    plt.ylabel("percent error reduction")
+    plt.show()
+
+    "4"     
+
+def method2Tester( inpChunk ):   
+    xOffsets = np.arange( -0.35, 0.35, 0.04 )
+    yOffsets = np.arange( -0.35, 0.35, 0.04 )
+
+    yO, xO = np.meshgrid( xOffsets, yOffsets )
+    rO = np.zeros( xO.shape )
+
+    offsetTests = np.column_stack( (xO.flatten(), yO.flatten(), rO.flatten()) )
+    offsetErrors = []
+
+    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.5 ))
+    rotationErrors = []
+
+    for offsetTest in offsetTests:
+        initialError, overlapArea = inpChunk.determineDirectDifference( inpChunk, offsetTest )
+        predError, newError, v = findDifference2( inpChunk, inpChunk, offsetTest, 16 )
+        offsetErrors.append( -100*(newError-initialError)/initialError ) 
+
+    for rotationTest in rotationTests: 
+        initialError, overlapArea = inpChunk.determineDirectDifference( inpChunk, np.array( (0,0,rotationTest) ) )
+        predError, newError, v = findDifference2( inpChunk, inpChunk, np.array( (0,0,rotationTest) ), 16 )
+        rotationErrors.append( -100*(newError-initialError)/initialError ) 
+
+    plt.figure(1512)
+    """plt.xticks(np.arange( -0.3, 0.3, 0.1 ))
+    plt.yticks(np.arange( -0.3, 0.3, 0.1 ))"""
+    bar = plt.imshow(np.array( offsetErrors ).reshape( xO.shape ), extent=[np.min(xOffsets), np.max(xOffsets), np.min(yOffsets), np.max(yOffsets)]) 
+    plt.colorbar( bar )
+    plt.title("Percentage error reduction")
+    plt.xlabel("x displacement error")
+    plt.ylabel("y displacement error")
+
+    plt.figure(1514)
+    plt.plot( np.rad2deg(rotationTests), np.array(rotationErrors) )
+    plt.title("Percentage error reduction")
+    plt.xlabel("rotation error (deg)")
+    plt.ylabel("percent error reduction")
+    plt.show()
+
+    "4"      
 
 for i in range( 0, len(allScanData) ):
     cRawScan:RawScanFrame = allScanData[i]
@@ -331,13 +459,17 @@ for i in range( 0, len(allScanData) ):
 
         parentChunk.addChunks( chunkStack )
 
+        #errorTester( chunkStack[32] )
         superTuner( chunkStack[32] )
         #featurelessAutoTune( chunkStack[32]  )
         
         conf = chunkStack[32].config
-        conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.ANGLE_OVERWIRTE_THRESHOLD = 0.03089128 ,0.00952647, 0.0011058  ,0.20442749
+        #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE,conf.CONFLICT_MULT_GAIN = 0.00147138 ,0.00365946 ,0.00283191 ,0.400286
+        
+        #method1Tester( chunkStack[32] )
 
-        offset, error, val = findDifference( chunkStack[32],chunkStack[32], (0, 0, np.deg2rad(15)), 40, True ) 
+        #offset, error, val = findDifference2( chunkStack[32],chunkStack[32], (0.1, -0.1, np.deg2rad(10)), 30 ) 
+        #offset, error, val = findDifference( chunkStack[32],chunkStack[32], (0.1, -0.1, np.deg2rad(10)), 30, True ) 
         #featurelessFullTest( chunkStack[32] )
 
         chunkStack = []
