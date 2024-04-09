@@ -72,9 +72,11 @@ class CartesianPose:
         this.roll += inputPose.roll
         this.pitch += inputPose.pitch
         this.yaw += inputPose.yaw
+        
+        return this
     
     def subtractPose(this, inputPose ):
-        """Add's input pose to this pose, doesn't perform any rotations just add's values"""
+        """Subtracts input pose to this pose, doesn't perform any rotations just add's values"""
         this.x -= inputPose.x
         this.y -= inputPose.y
         this.z -= inputPose.z
@@ -82,9 +84,11 @@ class CartesianPose:
         this.roll -= inputPose.roll
         this.pitch -= inputPose.pitch
         this.yaw -= inputPose.yaw
+
+        return this
     
     def divide(this, value ):
-        """Add's input pose to this pose, doesn't perform any rotations just add's values"""
+        """Divides this pose by input pose"""
         this.x /= value
         this.y /= value
         this.z /= value

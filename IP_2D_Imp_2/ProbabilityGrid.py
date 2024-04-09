@@ -158,6 +158,43 @@ class ProbabilityGrid:
         #                    observation region masked by where objects don't exist
         this.negativeData += observationRegion * (interceptionRegion==0)
 
+    @staticmethod 
+    def initFromGridStack( gridStack:list[ProbabilityGrid], onlyMergeEstimate=False  ):
+        """ This creates a probability grid from a large number of input grids """
+
+        if ( not onlyMergeEstimate ):
+            raise RuntimeError("feature not implemented")
+        
+        xMin = 10000000000
+        xMax = -10000000000
+        yMin = 10000000000
+        yMax = -10000000000 
+        
+        # Calculates the endpoints of the scans as well as the limits of the final probability grid
+        for targGrid in gridStack: 
+            xMax = max( targGrid.xMax, xMax  )
+            xMin = min( targGrid.xMin, xMin  )
+            yMax = max( targGrid.yMax, yMax  )
+            yMin = min( targGrid.yMin, yMin  )
+
+        cellRes = gridStack[0].cellRes
+        nGrid = ProbabilityGrid( xMin, xMax, yMin, yMax, cellRes )
+        nGrid.mapEstimate = np.zeros( nGrid.negativeData.shape )
+        #absEst = np.zeros( nGrid.negativeData.shape )
+
+        for targGrid in gridStack:
+            gridXCorn = int((targGrid.xMin - nGrid.xMin)*cellRes)
+            gridYCorn = int((targGrid.yMin - nGrid.yMin)*cellRes)
+
+
+            nGrid.mapEstimate[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate*np.abs(targGrid.mapEstimate)
+            #absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate**2
+        
+        nGrid.mapEstimate = nGrid.mapEstimate.clip(-1,1)#/absEst
+
+        return nGrid
+            
+
     def copyTranslated( this, angle, translation, onlyRotateEstimate=False ):
         """ returns a new probability grid which is this but rotated by angle, translation is applied before rotation.
          the rotation is done about this probability grids 0,0 which lines up with the centre of observation

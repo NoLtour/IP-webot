@@ -8,6 +8,7 @@ from CommonLib import gaussianKernel, fancyPlot, solidCircle
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
+from scipy.optimize import minimize
 from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
@@ -68,6 +69,9 @@ class Chunk:
     """ SECTION - mergers? """ 
     def addChunks( this, subChunks:list[Chunk] ):
         """ Adds chunks, establishing relations between them """
+        if ( len(this.subChunks) != 0 ):
+            raise RuntimeError("Not implemented to add to initialized chunk groups")
+
         this.subChunks.extend( subChunks )
         for nSubChunk in subChunks:
             nSubChunk.parent = this
@@ -91,15 +95,60 @@ class Chunk:
                 X, Y, yaw = otherChunk.determineInitialOffset()
                  
                 otherChunk.offsetFromParent = CartesianPose( X, Y, 0, 0, 0, yaw )
+    
+    """ SECTION - data integrity managers """
+    def clearCache( this ):
+        """ Run when there are changes to this parents children which mean cached values are no longer valid
+         this is done recursively to target all grand parents """
+        this.cachedProbabilityGrid = None
 
+        if ( this.parent != None ):
+            this.parent.clearCache
+
+    
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
+
+    def getCommonParent( this, otherChunk:Chunk ):
+        """ returns the most appropriate parent for 2 chunks being compared, if they share a parent that parent is returned
+         if one of the two chunks is the parent of the other, then it is returned """
+        
+        if ( this.parent == otherChunk.parent ):
+            return this.parent
+        
+        if ( this.subChunks.count( otherChunk ) == 1 ):
+            return this
+        
+        if ( otherChunk.subChunks.count( this ) == 1 ):
+            return otherChunk
+        
+        raise RuntimeError("No close relationship found")
 
     def getMapPose( this ):
         """ This is the chunks currently believed absolute position, atleast relative to the highest parent """
         # TODO make this return the estimated pose AFTER finding offsets of this node from whatever is defined as the origin
-        NotImplemented
-        return this.subChunkOffsets
+        
+        raise RuntimeError("Not implemented")
     
+    def getIntermsOfParent( this, otherChunk:Chunk, poseFromOther:CartesianPose ):
+        """ returns the cartesian offset of this chunk from the parent given a target chunk with our offset from it, both chunks must
+         hold the same parent """
+        
+        if ( this.parent != otherChunk.parent ):
+            raise RuntimeError("Chunks don't share parent")
+        
+        return otherChunk.getOffset( ).addPose( poseFromOther )
+    
+    def updateOffset( this, newOffset:CartesianPose ):
+        """ updates this chunks offset from parent, setting it to the new value """
+
+        this.offsetFromParent = newOffset
+        this.parent.clearCache()
+
+    def getOffset( this  ):
+        """ returns this chunks offset from it's parent  """
+        
+        return this.offsetFromParent.copy()
+
     def determineInitialOffset( this ):
         """ This makes the initial estimation of this chunks offset from it's parent, returning a pose representing the offset
           the returned pose is interms of the parent's orientation (forward, upward, alignedYaw)
@@ -147,23 +196,34 @@ class Chunk:
                 return this.cachedProbabilityGrid 
             offset = CartesianPose.zero() """
         
-        if ( this.isScanWrapper ):
-            probGrid = ProbabilityGrid.initFromScanFramesPoly( 
-                this.config.GRID_RESOLUTION,
-                this.rawScans,
-                this.centreScanIndex,
-                this.config.MAX_LIDAR_LENGTH#,
-                #offset
-            )
-            probGrid.estimateFeatures( this.config.IE_OBJECT_DIAM, this.config.IE_SHARPNESS ) 
-            
-            #if ( noOffset ):
-            this.cachedProbabilityGrid = probGrid 
- 
-            return probGrid
-             
-        else:
-            ""
+        if ( this.cachedProbabilityGrid == None ): 
+            if ( this.isScanWrapper ):
+                # Scan wrapper chunk logic 
+                    probGrid = ProbabilityGrid.initFromScanFramesPoly( 
+                        this.config.GRID_RESOLUTION,
+                        this.rawScans,
+                        this.centreScanIndex,
+                        this.config.MAX_LIDAR_LENGTH 
+                    )
+                    probGrid.estimateFeatures( this.config.IE_OBJECT_DIAM, this.config.IE_SHARPNESS ) 
+                    
+                    this.cachedProbabilityGrid = probGrid 
+
+            else:
+                # Composite chunk logic
+                transGrids = []
+                for subChunk in this.subChunks:
+                    transGrids.append( subChunk.constructProbabilityGrid(
+                        subChunk.getOffset()
+                    ) )
+
+                this.cachedProbabilityGrid = ProbabilityGrid.initFromGridStack( transGrids, True )
+        
+
+        if ( offset == -1 ):
+            return this.cachedProbabilityGrid 
+        return this.cachedProbabilityGrid.copyTranslated( offset.yaw, (offset.x, offset.y), True )
+
     
     """ SECTION - chunk comparison """
 
@@ -399,15 +459,45 @@ class Chunk:
 
         return xError, yError, angleError
 
-    def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
-        """ determines the error between two images without using features """
-
+    def determineErrorFeaturelessMinimum( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+        """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
         transOffset = otherChunk.determineInitialOffset()
         myOffset    = this.determineInitialOffset()
 
-        toTransVector = transOffset - myOffset
+        toTransVector = transOffset - myOffset + forcedOffset
+ 
+        def interpFunc( offsets ):
+            error, area = this.determineDirectDifference( otherChunk, offsets, True )
 
-        toTransVector += forcedOffset
+            if (np.isnan(error)):
+                return 1000
+            
+            return error
+ 
+        nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP} )
+    
+        trueOffset = ( nm.x[0], nm.x[1], nm.x[2] ) 
+        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset, True ) 
+
+        if (updateOffset):
+             this.updateOffset(
+                 this.getIntermsOfParent( otherChunk, CartesianPose( nm.x[0], nm.x[1], 0, 0, 0, nm.x[2] ) )
+             )
+
+        return trueOffset, errorScore, 1
+
+    def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
+        """ determines the error between two images without using features """
+
+        toTransVector = 0
+        if ( completeOffsetOverride ):
+            toTransVector = forcedOffset
+        else:
+            transOffset = otherChunk.determineInitialOffset()
+            myOffset    = this.determineInitialOffset()
+
+            toTransVector = transOffset - myOffset
+            toTransVector += forcedOffset
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
@@ -430,7 +520,6 @@ class Chunk:
         errorScore = 1000*np.sum(errorWindow)/mArea
 
         return errorScore, mArea
-
         
     def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
         """ determines the error between two images without using features """
@@ -461,10 +550,7 @@ class Chunk:
         plt.show()
 
         return errorScore, mArea
-
-    def determineOffsetFeatureless( this, otherChunk:Chunk ):
-        """ determines the offset using image comparison methods instead of feature matching """
-    
+ 
     def copyOverlaps( this, transChunk:Chunk, rotation:float, translation: Union[float, float], onlyMapEstimate=False ):
         """ 
             returns a copy of the overlapping region between both grids, it takes inputs in their refrance frames 
@@ -491,5 +577,21 @@ class Chunk:
 
         return thisWindow, transWindow
 
+    """ SECTION - full chunk layer manipulation """
+
+    def centredFeaturelessErrorReduction( this, minMethod:bool ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """
+        
+        centreChunk = this.subChunks[this.centreChunkIndex]
+
+        if ( minMethod ):
+            for targetChunk in this.subChunks:
+                if ( targetChunk != centreChunk ):
+                    centreChunk.determineErrorFeaturelessMinimum( targetChunk, np.zeros(3), True )
+        else:
+            # TODO implement for other method
+            raise RuntimeError("not implemented yet")
 
 

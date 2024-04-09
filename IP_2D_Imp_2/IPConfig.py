@@ -20,6 +20,9 @@ class IPConfig:
     ANGLE_OVERWIRTE_THRESHOLD   = np.deg2rad( 4 )
     CONFLICT_MULT_GAIN          = 0.5
 
+    # Minimiser featureless adjuster
+    MINIMISER_MAX_LOOP = 16
+
     # Scan propreties
     MAX_LIDAR_LENGTH = 8
 

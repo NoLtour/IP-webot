@@ -17,7 +17,7 @@ from scipy.optimize import differential_evolution
 from CommonLib import fancyPlot
 
 print("importing...")
-allScanData = RawScanFrame.importScanFrames( "cleanDataBackup" )
+allScanData = RawScanFrame.importScanFrames( "cleanData" )
 print("imported")
 
 # Noise step
@@ -38,10 +38,6 @@ class MAP_PROP:
 lpWindow = lp.PlotWindow(5, 15)
 gridDisp      = lp.LabelledGridGraphDisplay(5,0,5,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
 gridDisp2     = lp.LabelledGridGraphDisplay(10,0,15,5, lpWindow, (MAP_PROP.X_MAX-MAP_PROP.X_MIN)*MAP_PROP.PROB_GRID_RES, (MAP_PROP.Y_MAX-MAP_PROP.Y_MIN)*MAP_PROP.PROB_GRID_RES) 
- 
-
-rawStack = []
-chunkStack = []
 
 def genTestingSets( xSettings, ySettings, aSettings, numb ):
     xVals = np.arange( xSettings[0], xSettings[1], xSettings[2] )
@@ -424,6 +420,52 @@ def method2Tester( inpChunk ):
     plt.show()
 
     "4"      
+
+def mapMergeTest( frameCount ):
+    rawStack = []
+    chunkStack = []
+
+    for i in range( 0, len(allScanData) ):
+        cRawScan:RawScanFrame = allScanData[i]
+
+        rawStack.append( cRawScan )
+        
+        midScan = rawStack[int(len(rawStack)/2)]
+        if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
+            # Frame merge 
+            nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
+            rawStack = [ rawStack[-1] ] 
+
+            nChunk.constructProbabilityGrid() 
+
+            gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
+            
+            lpWindow.render()  
+
+            chunkStack.append( nChunk )
+        
+        if ( len( chunkStack ) > frameCount or len(allScanData)-1==i ):
+            """fancyPlot( chunkStack[12].cachedProbabilityGrid.mapEstimate )
+            fancyPlot( chunkStack[32].cachedProbabilityGrid.mapEstimate )
+            plt.show()"""
+
+            parentChunk = Chunk.initEmpty( config )
+
+            parentChunk.addChunks( chunkStack )
+
+            #parentChunk.centredFeaturelessErrorReduction( True )
+ 
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show()
+
+            return
+            
+
+
+
+mapMergeTest( 20 )
 
 for i in range( 0, len(allScanData) ):
     cRawScan:RawScanFrame = allScanData[i]
