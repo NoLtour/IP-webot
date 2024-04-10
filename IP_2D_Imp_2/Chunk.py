@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from RawScanFrame import RawScanFrame
-from scipy.spatial import KDTree
-from CartesianPose import CartesianPose
+from scipy.spatial import KDTree 
 from ProbabilityGrid import ProbabilityGrid
 from CommonLib import gaussianKernel, fancyPlot, solidCircle
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 from scipy.optimize import minimize
+from scipy.optimize import differential_evolution
 from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,7 +29,7 @@ class Chunk:
     config: IPConfig = IPConfig() # Can be changed
 
     """ RELATIONAL PROPERTIES - AS A CHILD """
-    offsetFromParent: CartesianPose = None
+    offsetFromParent: np.ndarray = None
     parent: Chunk = None
     """ This is given in the parent's coordinate frame! With the parent existing at 0,0 with the x axis aligned to its rotation! """
     
@@ -94,7 +94,7 @@ class Chunk:
             for otherChunk in this.subChunks:
                 X, Y, yaw = otherChunk.determineInitialOffset()
                  
-                otherChunk.offsetFromParent = CartesianPose( X, Y, 0, 0, 0, yaw )
+                otherChunk.offsetFromParent = np.array(( X, Y, yaw ))
     
     """ SECTION - data integrity managers """
     def clearCache( this ):
@@ -129,23 +129,26 @@ class Chunk:
         
         raise RuntimeError("Not implemented")
     
-    def getIntermsOfParent( this, otherChunk:Chunk, poseFromOther:CartesianPose ):
+    def getIntermsOfParent( this, otherChunk:Chunk, poseFromOther:np.ndarray ):
         """ returns the cartesian offset of this chunk from the parent given a target chunk with our offset from it, both chunks must
          hold the same parent """
         
         if ( this.parent != otherChunk.parent ):
             raise RuntimeError("Chunks don't share parent")
         
-        return otherChunk.getOffset( ).addPose( poseFromOther )
+        return otherChunk.getOffset( ) + ( poseFromOther )
     
-    def updateOffset( this, newOffset:CartesianPose ):
+    def updateOffset( this, newOffset:np.ndarray ):
         """ updates this chunks offset from parent, setting it to the new value """
 
         this.offsetFromParent = newOffset
         this.parent.clearCache()
 
     def getOffset( this  ):
-        """ returns this chunks offset from it's parent  """
+        """ returns this chunks offset from it's parent, if chunk has no parent it's simply zero """
+        
+        if ( this.parent == None ):
+            return np.zeros(3)
         
         return this.offsetFromParent.copy()
 
@@ -187,15 +190,9 @@ class Chunk:
         return frameList, offsetList
 
     """ SECTION - image construction """
-    def constructProbabilityGrid(this, offset:CartesianPose=-1 ):
+    def constructProbabilityGrid(this, offset:np.ndarray=None ):
         """ used by scan wrapper chunks to return a valid probabilty grid representing the chunk """
-        
-        """noOffset = offset==-1
-        if ( noOffset ):
-            if ( this.cachedProbabilityGrid != None ):
-                return this.cachedProbabilityGrid 
-            offset = CartesianPose.zero() """
-        
+          
         if ( this.cachedProbabilityGrid == None ): 
             if ( this.isScanWrapper ):
                 # Scan wrapper chunk logic 
@@ -217,12 +214,12 @@ class Chunk:
                         subChunk.getOffset()
                     ) )
 
-                this.cachedProbabilityGrid = ProbabilityGrid.initFromGridStack( transGrids, True )
+                this.cachedProbabilityGrid = ProbabilityGrid.initFromGridStack( transGrids, False )
         
 
-        if ( offset == -1 ):
+        if ( offset is None ):
             return this.cachedProbabilityGrid 
-        return this.cachedProbabilityGrid.copyTranslated( offset.yaw, (offset.x, offset.y), True )
+        return this.cachedProbabilityGrid.copyTranslated( offset[2], (offset[0], offset[1]), False )
 
     
     """ SECTION - chunk comparison """
@@ -230,8 +227,8 @@ class Chunk:
     def determineErrorFeatureless2( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
         """ estimates the poitional error between two images without using features """
 
-        transOffset = otherChunk.determineInitialOffset()
-        myOffset    = this.determineInitialOffset()
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
 
         toTransVector = transOffset - myOffset
 
@@ -367,8 +364,8 @@ class Chunk:
     def determineErrorFeatureless( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
         """ estimates the poitional error between two images without using features """
 
-        transOffset = otherChunk.determineInitialOffset()
-        myOffset    = this.determineInitialOffset()
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
 
         toTransVector = transOffset - myOffset
 
@@ -459,32 +456,95 @@ class Chunk:
 
         return xError, yError, angleError
 
-    def determineErrorFeaturelessMinimum( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+    def determineErrorFeaturelessMinimumOLD( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
         """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
-        transOffset = otherChunk.determineInitialOffset()
-        myOffset    = this.determineInitialOffset()
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
+        
+        #print( "\n\ninitOffset:", this.getOffset()*40 )
 
         toTransVector = transOffset - myOffset + forcedOffset
+        
+        initErrorScore, overlapArea = this.determineDirectDifference( otherChunk, toTransVector, True ) 
  
         def interpFunc( offsets ):
             error, area = this.determineDirectDifference( otherChunk, offsets, True )
 
             if (np.isnan(error)):
-                return 1000
+                return 9999999999
             
             return error
- 
-        nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP} )
+
+        initChange = np.array(( 5/this.config.GRID_RESOLUTION, 5/this.config.GRID_RESOLUTION, np.deg2rad(5) ))
+        nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP } )
     
         trueOffset = ( nm.x[0], nm.x[1], nm.x[2] ) 
-        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset, True ) 
+        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset, True )
+        
+        foundDirectionErrors =  toTransVector - trueOffset
 
         if (updateOffset):
              this.updateOffset(
-                 this.getIntermsOfParent( otherChunk, CartesianPose( nm.x[0], nm.x[1], 0, 0, 0, nm.x[2] ) )
+                 this.getIntermsOfParent( otherChunk, nm.x )
              )
+             
+        #print( "change:", nm.x*40 )
+        #print( "newOffset:", this.getOffset()*40 ) 
+        if ( initErrorScore < errorScore ):
+            return np.zeros(3), initErrorScore, 1
+        
+        return foundDirectionErrors, errorScore, 1
 
-        return trueOffset, errorScore, 1
+    def determineErrorFeaturelessMinimum( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+        """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
+        
+        #print( "\n\ninitOffset:", this.getOffset()*40 )
+
+        toTransVector = transOffset - myOffset 
+        
+        initErrorScore, overlapArea = this.determineDirectDifference( otherChunk, toTransVector + forcedOffset, True ) 
+        
+       # this.awoijd = 0
+        def interpFunc( offsets ): 
+            #this.awoijd+=1
+            error, area = this.determineDirectDifference( otherChunk, offsets + forcedOffset, True )
+            #print(this.awoijd, error, offsets )
+
+            if (np.isnan(error)):
+                return 9999999999
+            
+            return error
+
+        #initChange = np.array(( 5/this.config.GRID_RESOLUTION, 5/this.config.GRID_RESOLUTION, np.deg2rad(5) ))
+        bounds     = ( (-0.5,0.5), (-0.5,0.5), (-np.pi/2, np.pi/2) ) 
+        #nm = differential_evolution( interpFunc, bounds, x0=toTransVector, maxiter=5, strategy="currenttobest1exp")
+        #nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP } )
+        nm = minimize( interpFunc, toTransVector,  method="Powell", bounds=bounds, options={ 'maxfev': this.config.MINIMISER_MAX_LOOP, 'maxiter': this.config.MINIMISER_MAX_LOOP, "ftol":1 } )
+    
+        """
+        COBYLA -> 97
+        Powell -> 323
+        COBYLA -> 323
+        """
+    
+        trueOffset = np.array(( nm.x[0], nm.x[1], nm.x[2] )) 
+        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset + forcedOffset, True )
+        
+        foundDirectionErrors =  toTransVector - trueOffset
+
+        if (updateOffset):
+             this.updateOffset(
+                 otherChunk.getIntermsOfParent( this, trueOffset )
+             )
+             
+        #print( "change:", nm.x*40 )
+        #print( "newOffset:", this.getOffset()*40 ) 
+        if ( initErrorScore < errorScore ):
+            return np.zeros(3), initErrorScore, 1
+        
+        return foundDirectionErrors, errorScore, 1
 
     def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
         """ determines the error between two images without using features """
@@ -493,8 +553,8 @@ class Chunk:
         if ( completeOffsetOverride ):
             toTransVector = forcedOffset
         else:
-            transOffset = otherChunk.determineInitialOffset()
-            myOffset    = this.determineInitialOffset()
+            transOffset = otherChunk.getOffset()
+            myOffset    = this.getOffset()
 
             toTransVector = transOffset - myOffset
             toTransVector += forcedOffset
@@ -516,6 +576,9 @@ class Chunk:
         #if (mArea<10): return np.nan, np.nan
 
         errorWindow = -np.minimum( errorWindow, 0 ) 
+        
+        if ( mArea == 0 ):
+            return 1000000000, 0
 
         errorScore = 1000*np.sum(errorWindow)/mArea
 
@@ -524,8 +587,8 @@ class Chunk:
     def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
         """ determines the error between two images without using features """
 
-        transOffset = otherChunk.determineInitialOffset()
-        myOffset    = this.determineInitialOffset()
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
 
         toTransVector = transOffset - myOffset
 
@@ -543,11 +606,10 @@ class Chunk:
 
         errorScore = 1000*np.sum(errorWindow)/mArea
 
-        fancyPlot( thisWindow )
+        """fancyPlot( thisWindow )
         fancyPlot( transWindow )
-        fancyPlot( errorWindow )
-        fancyPlot( thisWindow-transWindow )
-        plt.show()
+        fancyPlot( errorWindow )"""
+        fancyPlot( thisWindow-transWindow ) 
 
         return errorScore, mArea
  
@@ -589,7 +651,11 @@ class Chunk:
         if ( minMethod ):
             for targetChunk in this.subChunks:
                 if ( targetChunk != centreChunk ):
+                    centreChunk.plotDifference( targetChunk )
                     centreChunk.determineErrorFeaturelessMinimum( targetChunk, np.zeros(3), True )
+                    centreChunk.plotDifference( targetChunk )
+                    plt.show()
+                    ""
         else:
             # TODO implement for other method
             raise RuntimeError("not implemented yet")

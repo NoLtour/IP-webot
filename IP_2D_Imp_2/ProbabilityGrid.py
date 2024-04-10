@@ -161,9 +161,7 @@ class ProbabilityGrid:
     @staticmethod 
     def initFromGridStack( gridStack:list[ProbabilityGrid], onlyMergeEstimate=False  ):
         """ This creates a probability grid from a large number of input grids """
-
-        if ( not onlyMergeEstimate ):
-            raise RuntimeError("feature not implemented")
+ 
         
         xMin = 10000000000
         xMax = -10000000000
@@ -188,9 +186,19 @@ class ProbabilityGrid:
 
 
             nGrid.mapEstimate[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate*np.abs(targGrid.mapEstimate)
+            
+            if ( not onlyMergeEstimate ):
+                nGrid.negativeData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.negativeData 
+                nGrid.positiveData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.positiveData 
             #absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate**2
         
         nGrid.mapEstimate = nGrid.mapEstimate.clip(-1,1)#/absEst
+        #nGrid.negativeData = nGrid.negativeData.clip(-1,1)#/absEst
+        #nGrid.positiveData = nGrid.positiveData.clip(-1,1)#/absEst
+        
+        fancyPlot( nGrid.negativeData )
+        fancyPlot( nGrid.positiveData )
+        plt.show()
 
         return nGrid
             
@@ -302,10 +310,10 @@ class ProbabilityGrid:
         oup = convolve2d( oup, gaussianKernel( pixelWidth/3, 0.1 ), mode="same" )
         #fancyPlot( oup )
         
-        oup = np.where( this.negativeData*sharpnessMult  > oup, 0, oup )
+        oup = np.minimum( np.where( this.negativeData*sharpnessMult  > oup, 0, oup ), 0.99  )
         #fancyPlot( oup ) 
          
-        this.mapEstimate = np.minimum( np.maximum( this.positiveData, oup ), 1  ) - this.negativeData
+        this.mapEstimate = np.maximum( this.positiveData, oup ) - this.negativeData
         #fancyPlot(  this.mapEstimate )
         
         #plt.show()

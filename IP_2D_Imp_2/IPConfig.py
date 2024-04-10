@@ -7,7 +7,7 @@ class IPConfig:
     OBJECT_DIAMETER = 0.5
     OBJECT_PIX_RADI = int(GRID_RESOLUTION*OBJECT_DIAMETER/2)
     OBJECT_PIX_DIAM = OBJECT_PIX_RADI*2 + 1
-    MAX_FRAMES_MERGE = 8
+    MAX_FRAMES_MERGE = 5
     MAX_INTER_FRAME_ANGLE = np.rad2deg(2220)
 
     # Featureless adjuster
@@ -18,10 +18,10 @@ class IPConfig:
     FEATURELESS_A_ERROR_SCALE   = 16#0.06
     FEATURELESS_COMP_FACT       = 0
     ANGLE_OVERWIRTE_THRESHOLD   = np.deg2rad( 4 )
-    CONFLICT_MULT_GAIN          = 0.5
+    CONFLICT_MULT_GAIN          = 0.8
 
     # Minimiser featureless adjuster
-    MINIMISER_MAX_LOOP = 16
+    MINIMISER_MAX_LOOP = 350
 
     # Scan propreties
     MAX_LIDAR_LENGTH = 8

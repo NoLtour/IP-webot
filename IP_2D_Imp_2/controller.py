@@ -96,7 +96,7 @@ class RobotController:
         this.setWheelVelocity( lVel, rVel )
         
         if (not this.navigator.hasTarget()):
-            RawScanFrame.exportScanFrames( this.allRawScans, "cleanData" )
+            RawScanFrame.exportScanFrames( this.allRawScans, "cleanDataWide" )
         
         return
         lpRoboDisplay.parseData( this.navigator.currentPose, this.realPose, [[0],[0]] ) 
