@@ -25,6 +25,21 @@ def gaussianKernel(sigma, cutoff=0.02):
     )
     return kernel / np.sum(kernel)
  
+def generate1DGuassianDerivative( sigma, cutoff=0.02 ):
+    radius = int(np.sqrt((-2*sigma**2) * np.log(cutoff/sigma)))
+
+    x      = np.arange( -radius, radius+1, 1 )
+    kernel = (1/(2*np.pi*sigma**2)) * np.exp(-(x**2)/(2*sigma**2))
+    kernel[radius] = 0
+    kernel /= np.sum(kernel)
+    
+    grad = np.where( x<0, -kernel, kernel) #np.gradient( kernel )
+    
+    dx = np.column_stack( grad )
+    dy = np.transpose( dx )
+    
+    return dx, dy
+ 
 fplotN = 0
 def fancyPlot( inp ):
     global fplotN

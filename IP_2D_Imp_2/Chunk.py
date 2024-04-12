@@ -3,7 +3,7 @@ from __future__ import annotations
 from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree 
 from ProbabilityGrid import ProbabilityGrid
-from CommonLib import gaussianKernel, fancyPlot, solidCircle
+from CommonLib import gaussianKernel, fancyPlot, solidCircle, generate1DGuassianDerivative
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
@@ -224,6 +224,104 @@ class Chunk:
     
     """ SECTION - chunk comparison """
 
+    def determineErrorFeatureless3( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
+        """ estimates the poitional error between two images without using features """
+
+        transOffset = otherChunk.getOffset()
+        myOffset    = this.getOffset()
+
+        toTransVector = transOffset - myOffset
+
+        toTransVector += forcedOffset
+
+        # Overlap is extracted
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) ) 
+        
+        # First the search region is defined
+        searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
+        #convTrans = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4), mode="same" )
+        intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
+        
+        x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
+        
+        errorWindow = -np.minimum(thisWindow*transWindow, 0)
+        errorWindow = -(thisWindow*transWindow) 
+        #fancyPlot( errorWindow )
+        #errorWindow = convolve2d( errorWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+
+        conflictWindow = (thisWindow*transWindow) 
+        conflictWindow = -np.minimum( conflictWindow, 0 )  
+
+        #fancyPlot( errorWindow )
+        erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
+        erDy = convolve2d( errorWindow, y1DGuas, mode="same" )
+        #erDy, erDx = np.gradient( errorWindow )*intrestMask
+        
+        lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
+        if ( lengthScale==0 ): return 0,0,0
+        
+        #fancyPlot( erDx )
+        
+        erDx = conflictWindow*np.where(thisWindow<0,erDx,-erDx)/lengthScale 
+        erDy = conflictWindow*np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+        
+        #fancyPlot( erDx )
+        #fancyPlot( erDy )
+        #fancyPlot( erDy )
+        #plt.show( block=False )
+        
+        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
+        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
+         
+        maxErr = max(np.max( erDx ),np.max( erDy ))
+        erDyMask = (np.abs(erDy)>0)
+        erDxMask = (np.abs(erDx)>0)
+        
+        xError = np.sum(erDx)
+        yError = np.sum(erDy)
+
+        rows, cols = errorWindow.shape  
+        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+        origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
+        x_offset = (x_coords - origin[0])
+        y_offset = (y_coords - origin[1]) 
+
+        # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
+        sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
+        x_tangential_vector = y_offset/sepLen
+        y_tangential_vector = -x_offset/sepLen 
+
+        erDa = -(x_tangential_vector*( erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+        erDa = -(x_tangential_vector*erDx + y_tangential_vector*erDy) - erDa 
+
+        angleError = np.sum(erDa) * this.config.FEATURELESS_A_ERROR_SCALE
+        if ( np.isnan(angleError) ):
+            angleError = 0 # TODO fix it
+
+
+        errorWindow *= thisWindow<0
+        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+
+        if ( showPlot ):
+            #fancyPlot( thisWindow )
+            #fancyPlot( transWindow )
+             
+            fancyPlot( sepLen )
+            fancyPlot( x_tangential_vector )
+            fancyPlot( y_tangential_vector )
+            
+            fancyPlot( x_tangential_vector*erDx )
+            fancyPlot( y_tangential_vector*erDy )
+            
+            fancyPlot( errorWindow )
+            fancyPlot( thisWindow-transWindow )
+            fancyPlot( intrestMask )
+
+            plt.show(block=False)
+ 
+
+        return xError, yError, angleError
+
     def determineErrorFeatureless2( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
         """ estimates the poitional error between two images without using features """
 
@@ -237,12 +335,16 @@ class Chunk:
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
 
+        #thisWindow = convolve2d( thisWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+        #transWindow = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+        
         # First the search region is defined
         searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
         #convTrans = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4), mode="same" )
         intrestMask = ((convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0)*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
         
         errorWindow = (thisWindow - transWindow) * intrestMask*np.abs(thisWindow * transWindow)
+        errorWindow = convolve2d( errorWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
 
         conflictWindow = (thisWindow*transWindow*intrestMask)
         
@@ -284,17 +386,24 @@ class Chunk:
         # Imperical adjustments made to make final errors more accurate
         #erDx = (thisWindow<0)*erDx/lengthScale 
         #erDy = (thisWindow<0)*erDy/lengthScale 
+        
+        
         erDx = np.where(thisWindow<0,erDx,-erDx)/lengthScale 
         erDy = np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+        
+        #erDx = convolve2d( erDx, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
+        #erDy = convolve2d( erDy, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
+        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
+        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
          
-
         maxErr = max(np.max( erDx ),np.max( erDy ))
-        erDyMask = (np.abs(erDy)>maxErr*0.1)
-        erDxMask = (np.abs(erDx)>maxErr*0.1)
+        erDyMask = (np.abs(erDy)>maxErr*0.025)
+        erDxMask = (np.abs(erDx)>maxErr*0.025)
         """erDx *= erDxMask
         erDy *= erDyMask"""
-        xError = np.sum(erDx)*this.config.FEATURELESS_X_ERROR_SCALE 
-        yError = np.sum(erDy)*this.config.FEATURELESS_Y_ERROR_SCALE
+        
+        xError = np.sum(erDx)
+        yError = np.sum(erDy)
 
         rows, cols = errorWindow.shape  
         x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
@@ -315,14 +424,24 @@ class Chunk:
         plt.show(block=False)"""
         
 
-        angleError = -np.sum(x_tangential_vector*( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+        #angleError = -np.sum(x_tangential_vector*( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
         #angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)
 
-        angleError *= this.config.FEATURELESS_A_ERROR_SCALE
+        erDa = -(x_tangential_vector*( erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+        erDa = -(x_tangential_vector*erDx + y_tangential_vector*erDy) - erDa
 
-        angleError *= conflictMultiplier
+        angleError = np.sum(erDa) * this.config.FEATURELESS_A_ERROR_SCALE
+
+        """ratio = erDx/erDy
+        aErDy = erDa/( x_tangential_vector*ratio + y_tangential_vector )
+        aErDx = aErDy*ratio
+        
+        xError -= np.sum( aErDx )
+        yError -= np.sum( aErDy )"""
+        
+        """angleError *= conflictMultiplier
         xError *= conflictMultiplier
-        yError *= conflictMultiplier
+        yError *= conflictMultiplier"""
 
         """if ( abs(angleError) > this.config.ANGLE_OVERWIRTE_THRESHOLD ):
             xError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError
@@ -360,7 +479,7 @@ class Chunk:
  
 
         return xError, yError, angleError
-
+    
     def determineErrorFeatureless( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
         """ estimates the poitional error between two images without using features """
 
@@ -609,7 +728,7 @@ class Chunk:
         """fancyPlot( thisWindow )
         fancyPlot( transWindow )
         fancyPlot( errorWindow )"""
-        fancyPlot( thisWindow-transWindow ) 
+        fancyPlot( (thisWindow-transWindow) ) 
 
         return errorScore, mArea
  
