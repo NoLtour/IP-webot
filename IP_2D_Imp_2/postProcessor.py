@@ -19,7 +19,7 @@ import random
 from CommonLib import fancyPlot
 
 print("importing...")
-allScanData = RawScanFrame.importScanFrames( "cleanDataWide" )
+allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "cleanDataWideNew4" )
 print("imported")
 
 # Noise step
@@ -601,19 +601,23 @@ def mapMergeTest( index0, frameCount ):
             plt.show(block=False)
             parentChunk.linearFeaturelessErrorReduction( 1 )
             parentChunk.linearFeaturelessErrorReduction( 2 ) 
+            
  
             fancyPlot(
                 parentChunk.constructProbabilityGrid().mapEstimate
             )
             plt.show(block=False)
             
-            parentChunk.linearFeaturelessErrorReduction( 10 ) 
+            parentChunk.linearPrune( 1, 1.8 ) 
+            parentChunk.linearFeaturelessErrorReduction( 1 )
  
             fancyPlot(
                 parentChunk.constructProbabilityGrid().mapEstimate
             )
             plt.show(block=False)
             
+            parentChunk.linearFeaturelessErrorReduction( 3 )
+            parentChunk.linearPrune( 3, 1.2 ) 
             parentChunk.centredFeaturelessErrorReduction( False ) 
             fancyPlot(
                 parentChunk.constructProbabilityGrid().mapEstimate
@@ -729,12 +733,54 @@ def singleMinTest( testingChunk:Chunk ):
     
     ""
       
+def showRotateTest( inChunk:Chunk, angle=np.deg2rad( 10 ) ): 
+    # Overlap is extracted
+    thisWindow, transWindow = inChunk.copyOverlaps( inChunk, angle, (0,0) )
+
+    fancyPlot( transWindow )
+    fancyPlot( transWindow*(transWindow>0) )
+
+    plt.show(block=False)
+    ""
+
+def plotPathError():
+    estPos = []
+    realPos = []
+
+    for cScan in allScanData:
+        realPos.append( [cScan.truePose.x, cScan.truePose.y] )
+        estPos.append( [cScan.pose.x, cScan.pose.y] )
+
+    estPos = np.array(estPos)
+    realPos = np.array(realPos)
+
+    plt.figure(4982)
+    plt.plot( estPos[:,0], estPos[:,1], "r--" )
+    plt.plot( realPos[:,0], realPos[:,1], "b-" )
+    plt.show()
+
+def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
+    
+    #fancyPlot( inpChunk2.cachedProbabilityGrid.mapEstimate )
+    #plt.show()
+
+    inpChunk1.determineErrorKeypoints( inpChunk2 )
 
 
-testingChunk = getChunk( 50 )
-#featurelessAutoTune( testingChunk )
+#plotPathError()
+
+testingChunk = getChunk( 2 )
+
+descriptorTest( getChunk( 45 ), getChunk( 49 ) )
+
+#showRotateTest( testingChunk )
+
+featurelessAutoTune( testingChunk )
+
+mapMergeTest( 10, 50 )
+
 conf = testingChunk.config
-conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE = 0.063324, 0.061625, 0.055572
+#conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE = 0.063324, 0.061625, 0.055572
 twoFramesTest( 44, 60, 47 )
 
 #mergeFrameRecursive( 20, 5 )
@@ -743,7 +789,7 @@ twoFramesTest( 44, 60, 47 )
 #errorTesterAlt(testingChunk)
 
 #featurelessFullTest(testingChunk)
-singleMinTest( testingChunk )
+#singleMinTest( testingChunk )
 #superTuner( testingChunk )
 #method2Tester( testingChunk )
 

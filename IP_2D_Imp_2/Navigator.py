@@ -198,7 +198,7 @@ class WheelEncoderCalculator:
 
 class Navigator:
     MAX_TARGET_ANGLE_DEVIATION = np.deg2rad( 4 )
-    TARGET_HIT_DISTANCE = 0.005
+    TARGET_HIT_DISTANCE = 0.06
     
     targetNodes: List[CartesianPose]
     currentTarget: CartesianPose
@@ -241,8 +241,8 @@ class Navigator:
         """ Updates the robot's position based of wheel rotation, equivilent to X*_k = R_BI F(u_k) """
         this.wheelEncoderCalculator.updatePose( this.currentPose, leftAngleChange, rightAngleChange )
  
-    FWD_R_SPEED = 1
-    BWD_R_SPEED = -1
+    FWD_R_SPEED = 0.6
+    BWD_R_SPEED = -0.6
     FORWARD_SPEED = 1
 
     QD_A_1 = (4*(FWD_R_SPEED-BWD_R_SPEED))
@@ -255,7 +255,7 @@ class Navigator:
     QD_C_2 = (-(3*QD_A_2/4 + QD_B_2))
     QD_D_2 = (FWD_R_SPEED)
     
-    ANGLE_SR_GAIN = 10
+    ANGLE_SR_GAIN = 4
     
     def splitWheelVelocity(this, targetAngle):
         speedRatio= max(min(0.5 + Navigator.ANGLE_SR_GAIN*targetAngle/(np.pi*2), 1), 0)

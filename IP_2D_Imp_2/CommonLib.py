@@ -61,3 +61,12 @@ def generateAngleArray(diameter):
      
     angle_array = np.arctan2(center - y, center - x)  
     return angle_array
+
+def convolveWithEdgeWrap(input_array, kernel):
+    # Calculate the amount of padding needed
+    pad_width = kernel.shape[0] // 2
+    # Pad the input array
+    padded_array = np.pad(input_array, pad_width, mode='wrap')
+    # Perform convolution
+    convolved = np.convolve(padded_array, kernel, mode='valid')
+    return convolved

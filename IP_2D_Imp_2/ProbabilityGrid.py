@@ -10,7 +10,11 @@ from RawScanFrame import RawScanFrame
 from CartesianPose import CartesianPose
 from scipy.ndimage import rotate
 
+from cv2 import KeyPoint 
+
 import matplotlib.pyplot as plt
+
+from ImageProcessor import ImageProcessor
 
 from CommonLib import gaussianKernel, solidCircle,  fancyPlot
 
@@ -29,13 +33,19 @@ class ProbabilityGrid:
     negativeData: np.ndarray
     positiveData: np.ndarray
     mapEstimate: np.ndarray
+
+    # These are given in integer pixel coordinates in the AMin frame
+    featureDescriptors: np.ndarray = None
+    asKeypoints:  list[KeyPoint] = None
     
+    # Continous coordiantes
     xMin:float
     xMax:float
     yMin:float
     yMax:float
     cellRes:float
     
+    # Int pixel coordinates
     xAMin:int
     xAMax:int
     yAMin:int
@@ -191,7 +201,7 @@ class ProbabilityGrid:
                 nGrid.negativeData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.negativeData 
                 nGrid.positiveData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.positiveData 
             
-            absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate**2
+            absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += abs(targGrid.mapEstimate)
         
         nGrid.mapEstimate = (nGrid.mapEstimate/absEst)
         #nGrid.negativeData = nGrid.negativeData.clip(-1,1)#/absEst
@@ -222,13 +232,13 @@ class ProbabilityGrid:
         nNegative = None
         nPositive = None
 
-        nEstimate = rotate( this.mapEstimate, np.rad2deg( -angle ) ) 
+        nEstimate = rotate( this.mapEstimate, np.rad2deg( -angle ), order=1 ) 
         # Rotations leave near zero errors, so I filter them out here
         nEstimate = np.where( np.abs(nEstimate)<0.001, 0, nEstimate )
 
         if ( not onlyRotateEstimate ):
-            nNegative = rotate( this.negativeData, np.rad2deg( angle ) )
-            nPositive = rotate( this.positiveData, np.rad2deg( angle ) ) 
+            nNegative = rotate( this.negativeData, np.rad2deg( angle ), order=1 )
+            nPositive = rotate( this.positiveData, np.rad2deg( angle ), order=1 ) 
             nNegative = np.where( np.abs(nNegative)<0.001, 0, nNegative )
             nPositive = np.where( np.abs(nPositive)<0.001, 0, nPositive )
 
@@ -319,5 +329,32 @@ class ProbabilityGrid:
         
         #plt.show()
 
+    def extractDescriptors( this ):
+        descRad = 8
+        extSize = descRad*2+1
 
-        
+        lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 2, 0.02 )  )
+        intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
+
+        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 30 )
+
+        plt.figure( 415 )
+        plt.imshow( this.mapEstimate, origin="lower" )
+        plt.plot(  intrestPoints[:,0], intrestPoints[:,1], "rx" )
+        plt.show( block=False )
+
+        # for desc in descriptors:
+        #     plt.figure( 4155 )
+        #     plt.plot(  desc  )
+        #     plt.show( block=False ) 
+        ""
+
+        this.featureDescriptors = descriptors.astype(np.float32)
+        this.asKeypoints = []
+
+        intrestPoints = intrestPoints# + np.array(( this.xAMin, this.yAMin ))
+
+        for desc, pos, angle in zip( this.featureDescriptors, intrestPoints, angleAlignment ):
+            this.asKeypoints.append( KeyPoint( float(pos[0]), float(pos[1]), extSize, angle=float(angle) ) )
+        "" 
+    

@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 
 from IPConfig import IPConfig
 
+import cv2
+
 class Chunk:
     """ A datastructure which recursively contains data relevant to building a map, with functions for processing that data
      across multiple levels in a way that improves the overall maps accuracy. Following composition over inheritance. """
@@ -108,6 +110,27 @@ class Chunk:
         if ( this.parent != None ):
             this.parent.clearCache()
 
+    def deleteSubChunks( this, indecies ): 
+        indecies = sorted(indecies, reverse=True)
+
+        for i in indecies:
+            targetChunk:Chunk = this.subChunks[i]
+
+            if ( targetChunk.isCentre ):
+                print("warning, attempt to delete centre chunk!")
+            else:
+                this.subChunks.pop( i )
+                targetChunk.parent = None
+                targetChunk.clearCache()
+
+        for i in range(0,len(this.subChunks)):
+            targetChunk:Chunk = this.subChunks[i]
+
+            if ( targetChunk.isCentre ):
+                this.centreChunkIndex = i
+        
+        this.clearCache()
+        
     
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
 
@@ -807,6 +830,54 @@ class Chunk:
 
         return thisWindow, transWindow
 
+    def determineErrorKeypoints( this, otherChunk:Chunk ):
+
+        this.cachedProbabilityGrid.extractDescriptors()
+        otherChunk.cachedProbabilityGrid.extractDescriptors()
+
+        image1 = np.uint8(255*(this.cachedProbabilityGrid.mapEstimate+1)/2)
+        image2 = np.uint8(255*(otherChunk.cachedProbabilityGrid.mapEstimate+1)/2)
+
+        thisKeypoints, thisDescriptors = this.cachedProbabilityGrid.asKeypoints, this.cachedProbabilityGrid.featureDescriptors
+        otherKeypoints, otherDescriptors = otherChunk.cachedProbabilityGrid.asKeypoints, otherChunk.cachedProbabilityGrid.featureDescriptors
+
+        ""
+
+        # Perform keypoint matching
+        FLANN_INDEX_KDTREE = 0
+        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+        search_params = dict(checks=50)  # or pass empty dictionary
+        flann = cv2.FlannBasedMatcher(index_params, search_params)
+
+        matches = flann.knnMatch(thisDescriptors, otherDescriptors, k=2)
+
+        # Apply ratio test
+        good_matches = []
+        for m, n in matches:
+            if m.distance < 0.9 * n.distance:
+                good_matches.append(m)
+
+        # Extract keypoints
+        src_pts = np.float32([thisKeypoints[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        dst_pts = np.float32([otherKeypoints[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+
+        # Apply RANSAC to estimate affine transformation
+        affine_matrix, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, ransacReprojThreshold=5.0)
+
+        # Filter out outliers
+        filtered_matches = [m for i, m in enumerate(good_matches) if inliers[i]]
+
+        # Draw filtered matches
+        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, filtered_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+        # Display the matched image
+        cv2.imshow('Matches', matched_image)
+
+        ""
+
+
+
+
     """ SECTION - full chunk layer manipulation """
 
     def centredFeaturelessErrorReduction( this, minMethod:bool ):
@@ -842,6 +913,32 @@ class Chunk:
                 rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
                 
                 rootChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+        
+
+    def linearPrune( this, skipSize, pruneMult=1.5 ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        
+        errors = []
+
+        for i in range(0, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+            if ( not targetChunk.isCentre ):
+                rootChunk:Chunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
+                
+                error, overlap = rootChunk.determineDirectDifference( targetChunk )
+
+                errors.append( error )
+
+        errors = np.array( errors )
+        maxError = np.median( errors )*pruneMult
+
+        pruneTargets = np.where( errors>maxError )[0]
+
+        this.deleteSubChunks( pruneTargets.tolist() )
+
+        
         
 
 

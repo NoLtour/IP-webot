@@ -31,7 +31,7 @@ class IPConfig:
 
     # Image estimation
     IE_OBJECT_DIAM = 0.5 *OBJECT_DIAMETER
-    IE_SHARPNESS   = 2.6
+    IE_SHARPNESS   = 3.6
 
     # Corner detector
     CORN_PEAK_SEARCH_RADIUS = int( OBJECT_PIX_RADI*0.5 + 0.5 )

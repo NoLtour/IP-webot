@@ -1,0 +1,23 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def create_gaussian_kernel(width, center_intensity=1, edge_intensity=0.05):
+    # Calculate the standard deviation based on the desired relationship
+    sigma = width / (2 * np.sqrt(2 * np.log(center_intensity / edge_intensity)))
+
+    # Calculate the kernel grid indices
+    x = np.arange(-width // 2 + 1, width // 2 + 1)
+    y = np.arange(-width // 2 + 1, width // 2 + 1)
+    xx, yy = np.meshgrid(x, y)
+
+    # Calculate the Gaussian kernel using the formula
+    kernel = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
+
+    # Normalize the kernel to ensure that the sum of elements is equal to 1
+    kernel /= np.sum(kernel)
+
+    return kernel
+
+plt.imshow( create_gaussian_kernel( 11 ) )
+
+plt.show()

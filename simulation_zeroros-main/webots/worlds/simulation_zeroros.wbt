@@ -307,7 +307,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999998 0.075
+        translation 0 0.13499999999997994 0.075
         rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
@@ -441,7 +441,7 @@ DEF ROBOT Robot {
         }
       ]
       rotationStep 0.261799
-      horizontalResolution 128
+      horizontalResolution 320
       fieldOfView 3.12
       numberOfLayers 1
       near 0.05
