@@ -410,9 +410,7 @@ def determineErrorCoupling( inpChunk:Chunk, scenarioCount=100 ):
     add_trend_line( displacementRatiosY, angularDeviationsY, 0.75, "b--", "y "  )
     add_trend_line( displacementRatiosB, angularDeviationsB, 0.7, "m--", "x+y "  )
     plt.legend()
-    plt.show()
-        
-    
+    plt.show() 
 
 def errorTester( inpChunk:Chunk ):   
     xOffsets = np.arange( -1.35, 1.35, 0.025 )
@@ -560,10 +558,10 @@ def method2Tester( inpChunk:Chunk ):
 
     "4"      
 
-def mapMergeTest( frameCount ):
+def mapMergeTest( index0, frameCount ):
     rawStack = []
     chunkStack = []
-
+    
     for i in range( 0, len(allScanData) ):
         cRawScan:RawScanFrame = allScanData[i]
 
@@ -571,17 +569,22 @@ def mapMergeTest( frameCount ):
         
         midScan = rawStack[int(len(rawStack)/2)]
         if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
-            # Frame merge 
-            nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
-            rawStack = [ rawStack[-1] ] 
+            if ( index0<=0 ):
+                # Frame merge 
+                nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
+                rawStack = [ rawStack[-1] ] 
 
-            nChunk.constructProbabilityGrid() 
+                nChunk.constructProbabilityGrid() 
 
-            gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
-            
-            lpWindow.render()  
+                gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
+                
+                lpWindow.render()  
 
-            chunkStack.append( nChunk )
+                chunkStack.append( nChunk )
+            else:
+                index0 -= 1
+                rawStack = []
+                chunkStack = []
         
         if ( len( chunkStack ) > frameCount or len(allScanData)-1==i ):
             """fancyPlot( chunkStack[12].cachedProbabilityGrid.mapEstimate )
@@ -592,15 +595,34 @@ def mapMergeTest( frameCount ):
 
             parentChunk.addChunks( chunkStack )
 
-            parentChunk.centredFeaturelessErrorReduction( True )
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
+            parentChunk.linearFeaturelessErrorReduction( 1 )
+            parentChunk.linearFeaturelessErrorReduction( 2 ) 
  
             fancyPlot(
                 parentChunk.constructProbabilityGrid().mapEstimate
             )
-            plt.show()
+            plt.show(block=False)
+            
+            parentChunk.linearFeaturelessErrorReduction( 10 ) 
+ 
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
+            
+            parentChunk.centredFeaturelessErrorReduction( False ) 
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
 
             return
-             
+ 
+         
 def getChunk( index ):
     rawStack = []
     chunkStack = []
@@ -624,6 +646,70 @@ def getChunk( index ):
             chunkStack.append( nChunk )
         
 
+def twoFramesTest( index1, index2, index3 ):
+    chunks = [ getChunk(index1), getChunk(index2), getChunk(index3) ]
+    
+    for c in chunks:
+        c.constructProbabilityGrid()
+        #fancyPlot( c.cachedProbabilityGrid.mapEstimate )
+    
+    parentChunk = Chunk.initEmpty( config )
+    
+    
+    parentChunk.addChunks( chunks )
+    
+    #parentChunk.subChunks[2].offsetFromParent = parentChunk.subChunks[2].offsetFromParent + np.array((0.1,0.1,0.1))
+    
+    chunks[0].plotDifference( chunks[2] )
+    chunks[0].determineErrorFeaturelessDirect( chunks[2], 15, np.zeros(3), True )
+    
+    chunks[0].plotDifference( chunks[2] )
+    
+    plt.show( block=False )
+    
+    ""
+
+def mergeFrameRecursive( frameCount, batchSize ):
+    rawStack = []
+    chunkStack = []
+
+    for i in range( 0, len(allScanData) ):
+        cRawScan:RawScanFrame = allScanData[i]
+
+        rawStack.append( cRawScan )
+        
+        midScan = rawStack[int(len(rawStack)/2)]
+        if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
+            # Frame merge 
+            nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
+            rawStack = [ rawStack[-1] ] 
+
+            nChunk.constructProbabilityGrid() 
+
+            gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
+            
+            lpWindow.render()  
+
+            chunkStack.append( nChunk )
+        
+        if ( len( chunkStack ) > frameCount or len(allScanData)-1==i ):
+            break
+    
+    
+    
+    parentChunk = Chunk.initEmpty( config )
+
+    parentChunk.addChunks( chunkStack )
+
+    parentChunk.centredFeaturelessErrorReduction( False )
+
+    fancyPlot(
+        parentChunk.constructProbabilityGrid().mapEstimate
+    )
+    plt.show()
+
+    return
+    
 
 def singleMinTest( testingChunk:Chunk ): 
     setOffset = np.array(( -0.18, 0.18, np.deg2rad(20) ))
@@ -645,20 +731,25 @@ def singleMinTest( testingChunk:Chunk ):
       
 
 
-#mapMergeTest( 7 )
 testingChunk = getChunk( 50 )
+#featurelessAutoTune( testingChunk )
+conf = testingChunk.config
+conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE = 0.063324, 0.061625, 0.055572
+twoFramesTest( 44, 60, 47 )
+
+#mergeFrameRecursive( 20, 5 )
+
+#mapMergeTest( 0, 240 )
 #errorTesterAlt(testingChunk)
 
-featurelessAutoTune( testingChunk )
 #featurelessFullTest(testingChunk)
 singleMinTest( testingChunk )
 #superTuner( testingChunk )
 #method2Tester( testingChunk )
-conf = testingChunk.config
 
 #findDifference( testingChunk, testingChunk, np.array((-0.1,0.24,np.deg2rad(22))), 100, True )
 
-#conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE = 0.02521316, 0.01265754, 0.05955067
+
 #featurelessFullTest(testingChunk)
 #method1Tester( testingChunk )
 #determineErrorCoupling( testingChunk, 300 )

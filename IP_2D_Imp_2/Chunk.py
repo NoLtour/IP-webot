@@ -31,6 +31,7 @@ class Chunk:
     """ RELATIONAL PROPERTIES - AS A CHILD """
     offsetFromParent: np.ndarray = None
     parent: Chunk = None
+    isCentre: bool = False
     """ This is given in the parent's coordinate frame! With the parent existing at 0,0 with the x axis aligned to its rotation! """
     
     """ MODIFICATION INFO - information relating to properties of this class and if they've been edited (hence requiring recalculation elsewhere) """
@@ -89,7 +90,9 @@ class Chunk:
             if ( forcedValue == -1 ):
                 this.centreChunkIndex = int(len(this.subChunks)/2)
             else:
-                this.centreChunkIndex = forcedValue 
+                this.centreChunkIndex = forcedValue
+                
+            this.subChunks[ this.centreChunkIndex ].isCentre = True
             
             for otherChunk in this.subChunks:
                 X, Y, yaw = otherChunk.determineInitialOffset()
@@ -103,7 +106,7 @@ class Chunk:
         this.cachedProbabilityGrid = None
 
         if ( this.parent != None ):
-            this.parent.clearCache
+            this.parent.clearCache()
 
     
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
@@ -129,21 +132,57 @@ class Chunk:
         
         raise RuntimeError("Not implemented")
     
-    def getIntermsOfParent( this, otherChunk:Chunk, poseFromOther:np.ndarray ):
-        """ returns the cartesian offset of this chunk from the parent given a target chunk with our offset from it, both chunks must
-         hold the same parent """
-        
-        if ( this.parent != otherChunk.parent ):
-            raise RuntimeError("Chunks don't share parent")
-        
-        return otherChunk.getOffset( ) + ( poseFromOther )
-    
     def updateOffset( this, newOffset:np.ndarray ):
         """ updates this chunks offset from parent, setting it to the new value """
 
+        if ( this.isCentre ):
+            raise RuntimeError("Cannot update the offset of the centre chunk!")
+        
         this.offsetFromParent = newOffset
         this.parent.clearCache()
 
+    def getNormalOffsetFromLocal( this, localOffset:np.ndarray ):
+        """ returns the offset in the parents refrance frame, after being provided a vector in this chunks refrence frame """
+        
+        thisPosition = this.getOffset()
+        
+        sepLength = np.sqrt( localOffset[0]**2 + localOffset[1]**2 )
+        newBeta = np.arctan2( localOffset[1], localOffset[0] )
+        beta = newBeta + thisPosition[2]
+        
+        normalOffset = np.array(( sepLength*np.cos( beta ), sepLength*np.sin( beta ), localOffset[2] ))
+        
+        return normalOffset
+        
+    def getLocalOffsetFromNormal( this, offset:np.ndarray ):
+        """ returns the offset in this chunks refrence frame, after being provided a vector in the parents refrence frame """ 
+
+        thisPosition = this.getOffset()
+        
+        sepLength = np.sqrt( offset[0]**2 + offset[1]**2 )
+        beta = np.arctan2( offset[1], offset[0] )
+        
+        newBeta = beta - thisPosition[2]
+        
+        localOffset = np.array((sepLength*np.cos( newBeta ), sepLength*np.sin( newBeta ), offset[2] ))
+        
+        return localOffset
+    
+    def getLocalOffsetFromTarget( this, otherChunk:Chunk ):
+        """ returns the offset from this chunk to the other, within this chunks local coordinate frame """
+         
+        if ( this.parent != otherChunk.parent ):
+            raise RuntimeError("Chunks don't share parent")
+        
+        thisPosition  = this.getOffset()
+        otherPosition = otherChunk.getOffset()
+        
+        # This offsets in parents refrance frame
+        offsetVector = otherPosition - thisPosition
+        
+        # Here it's converted into this chunks local refrance frame
+        return this.getLocalOffsetFromNormal( offsetVector )
+    
     def getOffset( this  ):
         """ returns this chunks offset from it's parent, if chunk has no parent it's simply zero """
         
@@ -225,55 +264,36 @@ class Chunk:
     """ SECTION - chunk comparison """
 
     def determineErrorFeatureless3( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
-        """ estimates the poitional error between two images without using features """
+        """ estimates the poitional error between two images without using features, the error is given in this chunks local refrance frame """
 
-        transOffset = otherChunk.getOffset()
-        myOffset    = this.getOffset()
-
-        toTransVector = transOffset - myOffset
-
-        toTransVector += forcedOffset
+        localToTargetVector = this.getLocalOffsetFromTarget( otherChunk ) + forcedOffset
 
         # Overlap is extracted
-        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) ) 
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
         
-        # First the search region is defined
-        searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
-        #convTrans = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4), mode="same" )
+        # First the search region is defined  
         intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
         
         x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
         
         errorWindow = -np.minimum(thisWindow*transWindow, 0)
-        errorWindow = -(thisWindow*transWindow) 
-        #fancyPlot( errorWindow )
-        #errorWindow = convolve2d( errorWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+        errorWindow = -(thisWindow*transWindow)  
 
         conflictWindow = (thisWindow*transWindow) 
         conflictWindow = -np.minimum( conflictWindow, 0 )  
-
-        #fancyPlot( errorWindow )
+ 
         erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
-        erDy = convolve2d( errorWindow, y1DGuas, mode="same" )
-        #erDy, erDx = np.gradient( errorWindow )*intrestMask
+        erDy = convolve2d( errorWindow, y1DGuas, mode="same" ) 
         
         lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
-        if ( lengthScale==0 ): return 0,0,0
-        
-        #fancyPlot( erDx )
+        if ( lengthScale==0 ): return 0,0,0 
         
         erDx = conflictWindow*np.where(thisWindow<0,erDx,-erDx)/lengthScale 
         erDy = conflictWindow*np.where(thisWindow<0,erDy,-erDy)/lengthScale  
-        
-        #fancyPlot( erDx )
-        #fancyPlot( erDy )
-        #fancyPlot( erDy )
-        #plt.show( block=False )
-        
+         
         erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
         erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
-         
-        maxErr = max(np.max( erDx ),np.max( erDy ))
+          
         erDyMask = (np.abs(erDy)>0)
         erDxMask = (np.abs(erDx)>0)
         
@@ -282,7 +302,7 @@ class Chunk:
 
         rows, cols = errorWindow.shape  
         x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
-        origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
+        origin = (localToTargetVector[0]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.xAMin, localToTargetVector[1]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.yAMin)
         x_offset = (x_coords - origin[0])
         y_offset = (y_coords - origin[1]) 
 
@@ -322,302 +342,304 @@ class Chunk:
 
         return xError, yError, angleError
 
-    def determineErrorFeatureless2( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
-        """ estimates the poitional error between two images without using features """
+    # def determineErrorFeatureless2( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
+    #     """ estimates the poitional error between two images without using features """
 
-        transOffset = otherChunk.getOffset()
-        myOffset    = this.getOffset()
+    #     transOffset = otherChunk.getOffset()
+    #     myOffset    = this.getOffset()
 
-        toTransVector = transOffset - myOffset
+    #     toTransVector = transOffset - myOffset
 
-        toTransVector += forcedOffset
+    #     toTransVector += forcedOffset
 
-        # Overlap is extracted
-        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+    #     # Overlap is extracted
+    #     thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
 
-        #thisWindow = convolve2d( thisWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
-        #transWindow = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+    #     #thisWindow = convolve2d( thisWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+    #     #transWindow = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
         
-        # First the search region is defined
-        searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
-        #convTrans = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4), mode="same" )
-        intrestMask = ((convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0)*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
+    #     # First the search region is defined
+    #     searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
+    #     #convTrans = convolve2d( transWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4), mode="same" )
+    #     intrestMask = ((convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0)*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
         
-        errorWindow = (thisWindow - transWindow) * intrestMask*np.abs(thisWindow * transWindow)
-        errorWindow = convolve2d( errorWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
+    #     errorWindow = (thisWindow - transWindow) * intrestMask*np.abs(thisWindow * transWindow)
+    #     errorWindow = convolve2d( errorWindow, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )
 
-        conflictWindow = (thisWindow*transWindow*intrestMask)
+    #     conflictWindow = (thisWindow*transWindow*intrestMask)
         
-        conflictWindow = -np.minimum( conflictWindow, 0 )  
+    #     conflictWindow = -np.minimum( conflictWindow, 0 )  
 
 
-        """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
-        #fancyPlot( nTransProbGrid.mapEstimate )
+    #     """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
+    #     #fancyPlot( nTransProbGrid.mapEstimate )
         
-        plt.figure(45)
-        plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
-        #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
+    #     plt.figure(45)
+    #     plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
+    #     plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
+    #     #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
         
-        plt.figure(46)
-        plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
-        #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )"""
+    #     plt.figure(46)
+    #     plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
+    #     plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
+    #     #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )"""
          
-        erDy, erDx = np.gradient( errorWindow ) 
-        #erDy = convolve2d( erDy, kernal, mode="same" ) *(thisWindow<0)
-        #erDx = convolve2d( erDx, kernal, mode="same" ) 
+    #     erDy, erDx = np.gradient( errorWindow ) 
+    #     #erDy = convolve2d( erDy, kernal, mode="same" ) *(thisWindow<0)
+    #     #erDx = convolve2d( erDx, kernal, mode="same" ) 
 
-        # Length scale keeps errors consistantly sized, here the y and x error are non-dimensionalised
-        #lengthScale = np.sqrt(np.sum(thisWindow*(thisWindow>0)))
-        #lengthScale = np.sum(np.abs(erDy))+np.sum(np.abs(erDx))
-        lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
-        if ( lengthScale==0 ): return 0,0,0
-        conflictMultiplier = 1 + this.config.CONFLICT_MULT_GAIN*np.sum(conflictWindow)/lengthScale
+    #     # Length scale keeps errors consistantly sized, here the y and x error are non-dimensionalised
+    #     #lengthScale = np.sqrt(np.sum(thisWindow*(thisWindow>0)))
+    #     #lengthScale = np.sum(np.abs(erDy))+np.sum(np.abs(erDx))
+    #     lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
+    #     if ( lengthScale==0 ): return 0,0,0
+    #     conflictMultiplier = 1 + this.config.CONFLICT_MULT_GAIN*np.sum(conflictWindow)/lengthScale
         
-        #conflictMultiplier = 1
+    #     #conflictMultiplier = 1
         
-        """fancyPlot( errorWindow )
-        fancyPlot( (thisWindow<0)*erDy/lengthScale ) 
-        fancyPlot( -((thisWindow>0)*erDy/lengthScale) )
-        fancyPlot( np.where(thisWindow<0,erDy,-erDy)/lengthScale ) 
-        plt.show()"""
+    #     """fancyPlot( errorWindow )
+    #     fancyPlot( (thisWindow<0)*erDy/lengthScale ) 
+    #     fancyPlot( -((thisWindow>0)*erDy/lengthScale) )
+    #     fancyPlot( np.where(thisWindow<0,erDy,-erDy)/lengthScale ) 
+    #     plt.show()"""
 
-        # Imperical adjustments made to make final errors more accurate
-        #erDx = (thisWindow<0)*erDx/lengthScale 
-        #erDy = (thisWindow<0)*erDy/lengthScale 
+    #     # Imperical adjustments made to make final errors more accurate
+    #     #erDx = (thisWindow<0)*erDx/lengthScale 
+    #     #erDy = (thisWindow<0)*erDy/lengthScale 
         
         
-        erDx = np.where(thisWindow<0,erDx,-erDx)/lengthScale 
-        erDy = np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+    #     erDx = np.where(thisWindow<0,erDx,-erDx)/lengthScale 
+    #     erDy = np.where(thisWindow<0,erDy,-erDy)/lengthScale  
         
-        #erDx = convolve2d( erDx, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
-        #erDy = convolve2d( erDy, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
-        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
-        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
+    #     #erDx = convolve2d( erDx, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
+    #     #erDy = convolve2d( erDy, gaussianKernel(this.config.FEATURELESS_PIX_SEARCH_DIAM/4, 0.05), mode="same" )*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
+    #     erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE*conflictMultiplier
+    #     erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE*conflictMultiplier
          
-        maxErr = max(np.max( erDx ),np.max( erDy ))
-        erDyMask = (np.abs(erDy)>maxErr*0.025)
-        erDxMask = (np.abs(erDx)>maxErr*0.025)
-        """erDx *= erDxMask
-        erDy *= erDyMask"""
+    #     maxErr = max(np.max( erDx ),np.max( erDy ))
+    #     erDyMask = (np.abs(erDy)>maxErr*0.025)
+    #     erDxMask = (np.abs(erDx)>maxErr*0.025)
+    #     """erDx *= erDxMask
+    #     erDy *= erDyMask"""
         
-        xError = np.sum(erDx)
-        yError = np.sum(erDy)
+    #     xError = np.sum(erDx)
+    #     yError = np.sum(erDy)
 
-        rows, cols = errorWindow.shape  
-        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
-        origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
-        x_offset = (x_coords - origin[0])
-        y_offset = (y_coords - origin[1]) 
+    #     rows, cols = errorWindow.shape  
+    #     x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+    #     origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
+    #     x_offset = (x_coords - origin[0])
+    #     y_offset = (y_coords - origin[1]) 
 
-        # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
-        sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
-        x_tangential_vector = y_offset/sepLen
-        y_tangential_vector = -x_offset/sepLen 
+    #     # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
+    #     sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
+    #     x_tangential_vector = y_offset/sepLen
+    #     y_tangential_vector = -x_offset/sepLen 
 
-        """fancyPlot( errorWindow )
-        fancyPlot( erDx )
-        fancyPlot( erDy )
-        fancyPlot( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) )
-        fancyPlot( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) )
-        plt.show(block=False)"""
+    #     """fancyPlot( errorWindow )
+    #     fancyPlot( erDx )
+    #     fancyPlot( erDy )
+    #     fancyPlot( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) )
+    #     fancyPlot( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) )
+    #     plt.show(block=False)"""
         
 
-        #angleError = -np.sum(x_tangential_vector*( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
-        #angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)
+    #     #angleError = -np.sum(x_tangential_vector*( erDx - erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*( erDy - erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+    #     #angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)
 
-        erDa = -(x_tangential_vector*( erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
-        erDa = -(x_tangential_vector*erDx + y_tangential_vector*erDy) - erDa
+    #     erDa = -(x_tangential_vector*( erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+    #     erDa = -(x_tangential_vector*erDx + y_tangential_vector*erDy) - erDa
 
-        angleError = np.sum(erDa) * this.config.FEATURELESS_A_ERROR_SCALE
+    #     angleError = np.sum(erDa) * this.config.FEATURELESS_A_ERROR_SCALE
 
-        """ratio = erDx/erDy
-        aErDy = erDa/( x_tangential_vector*ratio + y_tangential_vector )
-        aErDx = aErDy*ratio
+    #     """ratio = erDx/erDy
+    #     aErDy = erDa/( x_tangential_vector*ratio + y_tangential_vector )
+    #     aErDx = aErDy*ratio
         
-        xError -= np.sum( aErDx )
-        yError -= np.sum( aErDy )"""
+    #     xError -= np.sum( aErDx )
+    #     yError -= np.sum( aErDy )"""
         
-        """angleError *= conflictMultiplier
-        xError *= conflictMultiplier
-        yError *= conflictMultiplier"""
+    #     """angleError *= conflictMultiplier
+    #     xError *= conflictMultiplier
+    #     yError *= conflictMultiplier"""
 
-        """if ( abs(angleError) > this.config.ANGLE_OVERWIRTE_THRESHOLD ):
-            xError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError
-            yError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError"""
+    #     """if ( abs(angleError) > this.config.ANGLE_OVERWIRTE_THRESHOLD ):
+    #         xError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError
+    #         yError *= this.config.ANGLE_OVERWIRTE_THRESHOLD/angleError"""
 
-        #aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
-        #angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
+    #     #aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
+    #     #angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
 
-        # Reduce coupling effect
-        xCompensation = (1-np.cos(angleError))
-        yCompensation = (np.sin(angleError))
+    #     # Reduce coupling effect
+    #     xCompensation = (1-np.cos(angleError))
+    #     yCompensation = (np.sin(angleError))
 
-        #xError     -= xCompensation*this.config.FEATURELESS_COMP_FACT
-        #yError     -= yCompensation*this.config.FEATURELESS_COMP_FACT
+    #     #xError     -= xCompensation*this.config.FEATURELESS_COMP_FACT
+    #     #yError     -= yCompensation*this.config.FEATURELESS_COMP_FACT
 
-        errorWindow *= thisWindow<0
-        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+    #     errorWindow *= thisWindow<0
+    #     errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
 
-        if ( showPlot ):
-            #fancyPlot( thisWindow )
-            #fancyPlot( transWindow )
+    #     if ( showPlot ):
+    #         #fancyPlot( thisWindow )
+    #         #fancyPlot( transWindow )
              
-            fancyPlot( sepLen )
-            fancyPlot( x_tangential_vector )
-            fancyPlot( y_tangential_vector )
+    #         fancyPlot( sepLen )
+    #         fancyPlot( x_tangential_vector )
+    #         fancyPlot( y_tangential_vector )
             
-            fancyPlot( x_tangential_vector*erDx )
-            fancyPlot( y_tangential_vector*erDy )
+    #         fancyPlot( x_tangential_vector*erDx )
+    #         fancyPlot( y_tangential_vector*erDy )
             
-            fancyPlot( errorWindow )
-            fancyPlot( thisWindow-transWindow )
-            fancyPlot( intrestMask )
+    #         fancyPlot( errorWindow )
+    #         fancyPlot( thisWindow-transWindow )
+    #         fancyPlot( intrestMask )
 
-            plt.show(block=False)
+    #         plt.show(block=False)
  
 
-        return xError, yError, angleError
+    #     return xError, yError, angleError
     
-    def determineErrorFeatureless( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
-        """ estimates the poitional error between two images without using features """
+    # def determineErrorFeatureless( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
+    #     """ estimates the poitional error between two images without using features """
 
-        transOffset = otherChunk.getOffset()
-        myOffset    = this.getOffset()
+    #     transOffset = otherChunk.getOffset()
+    #     myOffset    = this.getOffset()
 
-        toTransVector = transOffset - myOffset
+    #     toTransVector = transOffset - myOffset
 
-        toTransVector += forcedOffset
+    #     toTransVector += forcedOffset
 
-        # Overlap is extracted
-        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+    #     # Overlap is extracted
+    #     thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
 
-        # First the search region is defined
-        searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
-        intrestMask = (convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
+    #     # First the search region is defined
+    #     searchKernal = solidCircle( this.config.FEATURELESS_PIX_SEARCH_DIAM )
+    #     intrestMask = (convolve2d( thisWindow>0, searchKernal, mode="same" ) )>0*((convolve2d( transWindow>0, searchKernal, mode="same" ))>0)
         
-        errorWindow = (thisWindow - transWindow) *intrestMask *np.abs(thisWindow * transWindow)
+    #     errorWindow = (thisWindow - transWindow) *intrestMask *np.abs(thisWindow * transWindow)
 
          
 
-        """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
-        #fancyPlot( nTransProbGrid.mapEstimate )
+    #     """#fancyPlot( this.cachedProbabilityGrid.mapEstimate )
+    #     #fancyPlot( nTransProbGrid.mapEstimate )
         
-        plt.figure(45)
-        plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
-        #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
+    #     plt.figure(45)
+    #     plt.imshow( thisProbGrid.mapEstimate, origin="lower" ) 
+    #     plt.plot( [thisLCXMin,thisLCXMin+cWidth], [thisLCYMin,thisLCYMin+cHeight], "bx"  )
+    #     #plt.plot( [-thisProbGrid.xAMin,translation[0]*thisProbGrid.cellRes-thisProbGrid.xAMin], [-thisProbGrid.yAMin,translation[1]*thisProbGrid.cellRes-thisProbGrid.xAMin], "ro"  )
         
-        plt.figure(46)
-        plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
-        plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
-        #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )"""
+    #     plt.figure(46)
+    #     plt.imshow( nTransProbGrid.mapEstimate, origin="lower" ) 
+    #     plt.plot( [transLCXMin,transLCXMin+cWidth], [transLCYMin,transLCYMin+cHeight], "bx"  )
+    #     #plt.plot( [-nTransProbGrid.xAMin], [-nTransProbGrid.yAMin], "ro"  )"""
         
-        kernal = gaussianKernel( 1 )
+    #     kernal = gaussianKernel( 1 )
          
-        erDy, erDx = np.gradient( errorWindow )
-        #erDy = convolve2d( erDy, kernal, mode="same" ) *(thisWindow<0)
-        #erDx = convolve2d( erDx, kernal, mode="same" ) 
+    #     erDy, erDx = np.gradient( errorWindow )
+    #     #erDy = convolve2d( erDy, kernal, mode="same" ) *(thisWindow<0)
+    #     #erDx = convolve2d( erDx, kernal, mode="same" ) 
         
-        # Imperical adjustments made to make final errors more accurate
-        erDy = this.config.FEATURELESS_Y_ERROR_SCALE*(thisWindow<0)*erDy#*convolve2d( erDy, kernal, mode="same" ) 
-        erDx = this.config.FEATURELESS_X_ERROR_SCALE*(thisWindow<0)*erDx#*convolve2d( erDx, kernal, mode="same" )  
+    #     # Imperical adjustments made to make final errors more accurate
+    #     erDy = this.config.FEATURELESS_Y_ERROR_SCALE*(thisWindow<0)*erDy#*convolve2d( erDy, kernal, mode="same" ) 
+    #     erDx = this.config.FEATURELESS_X_ERROR_SCALE*(thisWindow<0)*erDx#*convolve2d( erDx, kernal, mode="same" )  
 
-        # Length scale keeps errors consistantly sized
-        lengthScale = np.sqrt(np.sum(thisWindow*(thisWindow>0)))
-        yError = np.sum(erDy)/lengthScale
-        xError = np.sum(erDx)/lengthScale 
+    #     # Length scale keeps errors consistantly sized
+    #     lengthScale = np.sqrt(np.sum(thisWindow*(thisWindow>0)))
+    #     yError = np.sum(erDy)/lengthScale
+    #     xError = np.sum(erDx)/lengthScale 
 
-        rows, cols = errorWindow.shape  
-        x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
-        origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
-        x_offset = (x_coords - origin[0])
-        y_offset = (y_coords - origin[1]) 
+    #     rows, cols = errorWindow.shape  
+    #     x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
+    #     origin = (-this.cachedProbabilityGrid.xAMin, -this.cachedProbabilityGrid.yAMin)
+    #     x_offset = (x_coords - origin[0])
+    #     y_offset = (y_coords - origin[1]) 
 
-        # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
-        sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
-        x_tangential_vector = y_offset/sepLen
-        y_tangential_vector = -x_offset/sepLen 
+    #     # tangential and normal vectors are scaled inversely proportional to origin seperation (to account for increased offsets assosiated with larger seperation)
+    #     sepLen = np.maximum( ( np.square(x_offset) + np.square(y_offset) )/(this.config.GRID_RESOLUTION**2), 0.1 )
+    #     x_tangential_vector = y_offset/sepLen
+    #     y_tangential_vector = -x_offset/sepLen 
 
-        angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)/lengthScale
-        angleError *= this.config.FEATURELESS_A_ERROR_SCALE
+    #     angleError = -np.sum(x_tangential_vector*erDx + y_tangential_vector*erDy)/lengthScale
+    #     angleError *= this.config.FEATURELESS_A_ERROR_SCALE
 
-        # Reduce coupling effect
-        xCompensation = (1-np.cos(angleError))
-        yCompensation = (np.sin(angleError))
-        aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
+    #     # Reduce coupling effect
+    #     xCompensation = (1-np.cos(angleError))
+    #     yCompensation = (np.sin(angleError))
+    #     aCompensation = np.arctan( np.array([yError]),np.array([xError]) )[0]  
 
-        #xError     -= xCompensation*this.config.FEATURELESS_COMP_FACT
-        #yError     -= yCompensation*this.config.FEATURELESS_COMP_FACT
-        angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
+    #     #xError     -= xCompensation*this.config.FEATURELESS_COMP_FACT
+    #     #yError     -= yCompensation*this.config.FEATURELESS_COMP_FACT
+    #     angleError -= aCompensation*this.config.FEATURELESS_COMP_FACT
 
-        errorWindow *= thisWindow<0
-        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+    #     errorWindow *= thisWindow<0
+    #     errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
 
-        if ( True or showPlot ):
-            #fancyPlot( thisWindow )
-            #fancyPlot( transWindow )
+    #     if ( True or showPlot ):
+    #         #fancyPlot( thisWindow )
+    #         #fancyPlot( transWindow )
              
-            fancyPlot( sepLen )
-            fancyPlot( x_tangential_vector )
-            fancyPlot( y_tangential_vector )
+    #         fancyPlot( sepLen )
+    #         fancyPlot( x_tangential_vector )
+    #         fancyPlot( y_tangential_vector )
             
-            fancyPlot( x_tangential_vector*erDx )
-            fancyPlot( y_tangential_vector*erDy )
+    #         fancyPlot( x_tangential_vector*erDx )
+    #         fancyPlot( y_tangential_vector*erDy )
             
-            fancyPlot( errorWindow )
-            fancyPlot( thisWindow-transWindow )
-            fancyPlot( intrestMask )
+    #         fancyPlot( errorWindow )
+    #         fancyPlot( thisWindow-transWindow )
+    #         fancyPlot( intrestMask )
 
-            plt.show(block=False)
+    #         plt.show(block=False)
  
 
-        return xError, yError, angleError
+    #     return xError, yError, angleError
 
-    def determineErrorFeaturelessMinimumOLD( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+    # def determineErrorFeaturelessMinimumOLD( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+    #     """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
+    #     transOffset = otherChunk.getOffset()
+    #     myOffset    = this.getOffset()
+        
+    #     #print( "\n\ninitOffset:", this.getOffset()*40 )
+
+    #     toTransVector = transOffset - myOffset + forcedOffset
+        
+    #     initErrorScore, overlapArea = this.determineDirectDifference( otherChunk, toTransVector, True ) 
+ 
+    #     def interpFunc( offsets ):
+    #         error, area = this.determineDirectDifference( otherChunk, offsets, True )
+
+    #         if (np.isnan(error)):
+    #             return 9999999999
+            
+    #         return error
+
+    #     initChange = np.array(( 5/this.config.GRID_RESOLUTION, 5/this.config.GRID_RESOLUTION, np.deg2rad(5) ))
+    #     nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP } )
+    
+    #     trueOffset = ( nm.x[0], nm.x[1], nm.x[2] ) 
+    #     errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset, True )
+        
+    #     foundDirectionErrors =  toTransVector - trueOffset
+
+    #     if (updateOffset):
+    #          this.updateOffset(
+    #              this.getIntermsOfParent( otherChunk, nm.x )
+    #          )
+             
+    #     #print( "change:", nm.x*40 )
+    #     #print( "newOffset:", this.getOffset()*40 ) 
+    #     if ( initErrorScore < errorScore ):
+    #         return np.zeros(3), initErrorScore, 1
+        
+    #     return foundDirectionErrors, errorScore, 1
+
+    # def determineErrorFeaturelessMinimum( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
         """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
         transOffset = otherChunk.getOffset()
         myOffset    = this.getOffset()
         
-        #print( "\n\ninitOffset:", this.getOffset()*40 )
-
-        toTransVector = transOffset - myOffset + forcedOffset
-        
-        initErrorScore, overlapArea = this.determineDirectDifference( otherChunk, toTransVector, True ) 
- 
-        def interpFunc( offsets ):
-            error, area = this.determineDirectDifference( otherChunk, offsets, True )
-
-            if (np.isnan(error)):
-                return 9999999999
-            
-            return error
-
-        initChange = np.array(( 5/this.config.GRID_RESOLUTION, 5/this.config.GRID_RESOLUTION, np.deg2rad(5) ))
-        nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': this.config.MINIMISER_MAX_LOOP } )
-    
-        trueOffset = ( nm.x[0], nm.x[1], nm.x[2] ) 
-        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset, True )
-        
-        foundDirectionErrors =  toTransVector - trueOffset
-
-        if (updateOffset):
-             this.updateOffset(
-                 this.getIntermsOfParent( otherChunk, nm.x )
-             )
-             
-        #print( "change:", nm.x*40 )
-        #print( "newOffset:", this.getOffset()*40 ) 
-        if ( initErrorScore < errorScore ):
-            return np.zeros(3), initErrorScore, 1
-        
-        return foundDirectionErrors, errorScore, 1
-
-    def determineErrorFeaturelessMinimum( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
-        """ This finds the relative offset between two chunks without using features, using scipy.optimize.minimum """
-        transOffset = otherChunk.getOffset()
-        myOffset    = this.getOffset()
+        raise RuntimeError("Not implemented properly don't use")
         
         #print( "\n\ninitOffset:", this.getOffset()*40 )
 
@@ -665,21 +687,48 @@ class Chunk:
         
         return foundDirectionErrors, errorScore, 1
 
+    def determineErrorFeaturelessDirect( this, otherChunk:Chunk, iterations:int, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+        """ This finds the relative offset between two chunks without using features, using the custom method """
+        
+        errorScores = []
+        offsetValues = []
+        
+        offsetValues.append( forcedOffset.copy() )
+        errorScores.append( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
+        
+        for i in range(0, iterations):  
+            if ( errorScores[-1] < this.config.ITERATIVE_REDUCTION_PERMITTED_ERROR or ( i>3 and errorScores[-1]>errorScores[-4] ) ):
+                break # breaks early if the error is below some permitted threshold
+            
+            predictedErrors = np.array(this.determineErrorFeatureless3( otherChunk, forcedOffset ))
+            
+            forcedOffset -= predictedErrors*this.config.ITERATIVE_REDUCTION_MULTIPLIER
+            
+            offsetValues.append( forcedOffset.copy() )
+            errorScores.append( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
+            
+        lowestErrorIndex = np.argmin( np.array( errorScores ) )
+        
+        offsetAdjustment = offsetValues[ lowestErrorIndex ]
+        newErrorScore    = errorScores[ lowestErrorIndex ]
+        
+        if ( updateOffset ):
+            # this is found in parent refrance frame
+            toTargetVector = this.getNormalOffsetFromLocal( this.getLocalOffsetFromTarget( otherChunk ) + offsetAdjustment )
+            
+            targetNewPosition = toTargetVector + this.getOffset()
+            
+            otherChunk.updateOffset( targetNewPosition )
+            
+        return offsetAdjustment, newErrorScore
+    
     def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
         """ determines the error between two images without using features """
-
-        toTransVector = 0
-        if ( completeOffsetOverride ):
-            toTransVector = forcedOffset
-        else:
-            transOffset = otherChunk.getOffset()
-            myOffset    = this.getOffset()
-
-            toTransVector = transOffset - myOffset
-            toTransVector += forcedOffset
-
+        
+        localToTargetVector = this.getLocalOffsetFromTarget( otherChunk ) + forcedOffset
+  
         # Overlap is extracted
-        thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
+        thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) )
 
         thisPositive = thisWindow>0
         thisWindow = np.where( thisPositive, thisWindow*10, thisWindow )
@@ -734,12 +783,12 @@ class Chunk:
  
     def copyOverlaps( this, transChunk:Chunk, rotation:float, translation: Union[float, float], onlyMapEstimate=False ):
         """ 
-            returns a copy of the overlapping region between both grids, it takes inputs in their refrance frames 
+            returns a copy of the overlapping region between both grids, it takes inputs in their local refrance frames 
         """
 
 
-        thisProbGrid   = this.cachedProbabilityGrid
-        nTransProbGrid = transChunk.cachedProbabilityGrid.copyTranslated( rotation, translation, True )
+        thisProbGrid   = this.constructProbabilityGrid()
+        nTransProbGrid = transChunk.constructProbabilityGrid().copyTranslated( rotation, translation, True )
         
 
         cXMin = max( thisProbGrid.xAMin, nTransProbGrid.xAMin ) + 1
@@ -763,8 +812,7 @@ class Chunk:
     def centredFeaturelessErrorReduction( this, minMethod:bool ):
         """ sequentially through all children of this chunk, reducing the error using the selected reduction method
         it applies the reduction by comparing all children to the centre
-           """
-        
+           """ 
         centreChunk = this.subChunks[this.centreChunkIndex]
 
         if ( minMethod ):
@@ -776,7 +824,24 @@ class Chunk:
                     plt.show()
                     ""
         else:
-            # TODO implement for other method
-            raise RuntimeError("not implemented yet")
+            for targetChunk in this.subChunks:
+                if ( targetChunk != centreChunk ):
+                    #centreChunk.plotDifference( targetChunk )
+                    centreChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+                    #centreChunk.plotDifference( targetChunk )
+                    #plt.show(block=False)
+                    ""
+
+    def linearFeaturelessErrorReduction( this, skipSize ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        for i in range(0, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+            if ( not targetChunk.isCentre ):
+                rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
+                
+                rootChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+        
 
 

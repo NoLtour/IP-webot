@@ -178,7 +178,7 @@ class ProbabilityGrid:
         cellRes = gridStack[0].cellRes
         nGrid = ProbabilityGrid( xMin, xMax, yMin, yMax, cellRes )
         nGrid.mapEstimate = np.zeros( nGrid.negativeData.shape )
-        #absEst = np.zeros( nGrid.negativeData.shape )
+        absEst = np.zeros( nGrid.negativeData.shape )
 
         for targGrid in gridStack:
             gridXCorn = int((targGrid.xMin - nGrid.xMin)*cellRes)
@@ -190,15 +190,16 @@ class ProbabilityGrid:
             if ( not onlyMergeEstimate ):
                 nGrid.negativeData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.negativeData 
                 nGrid.positiveData[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.positiveData 
-            #absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate**2
+            
+            absEst[ gridYCorn:gridYCorn+targGrid.height, gridXCorn:gridXCorn+targGrid.width ] += targGrid.mapEstimate**2
         
-        nGrid.mapEstimate = nGrid.mapEstimate.clip(-1,1)#/absEst
+        nGrid.mapEstimate = (nGrid.mapEstimate/absEst)
         #nGrid.negativeData = nGrid.negativeData.clip(-1,1)#/absEst
         #nGrid.positiveData = nGrid.positiveData.clip(-1,1)#/absEst
         
-        fancyPlot( nGrid.negativeData )
-        fancyPlot( nGrid.positiveData )
-        plt.show()
+        #fancyPlot( nGrid.negativeData )
+        #fancyPlot( nGrid.positiveData )
+        #plt.show( block=False )
 
         return nGrid
             
