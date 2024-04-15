@@ -60,10 +60,8 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
     intrestMask = (x_coords**2 + y_coords**2) < ((inpImage.shape[0]/2)**2)
     intrestMask[ int(inpImage.shape[1]/2),int(inpImage.shape[0]/2) ] = 0 
 
-    dy, dx = np.gradient( inpImage )
-
-    dy = convolve2d( dy, gaussian_array, mode="valid" )
-    dx = convolve2d( dx, gaussian_array, mode="valid" )
+    dy, dx = np.gradient( convolve2d( inpImage, gaussian_array, mode="same" ) )
+ 
     magnitudes = np.sqrt(dy**2 + dx**2) 
 
     angles = np.mod(np.arctan2( dy, dx ) + 2*np.pi, 2*np.pi) 
@@ -79,7 +77,7 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
     alignedOutputs = np.roll( outputs, -avrgIndex )
 
     plt.figure(4)
-    plt.imshow(circle_image, cmap='gray')
+    plt.imshow(convolve2d( inpImage, gaussian_array, mode="same" ), cmap='gray')
     plt.title("Circle with varying perimeter thickness")
     plt.colorbar(label='Thickness')   
     plt.figure(8)
