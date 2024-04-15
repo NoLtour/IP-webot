@@ -56,6 +56,8 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
         [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
         [0.002969, 0.013306, 0.021938, 0.013306, 0.002969]
     ])
+    
+    kern = np.array((0.054,0.242,0.398,0.242,0.054))
 
     intrestMask = (x_coords**2 + y_coords**2) < ((inpImage.shape[0]/2)**2)
     intrestMask[ int(inpImage.shape[1]/2),int(inpImage.shape[0]/2) ] = 0 
@@ -69,8 +71,9 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
 
     outputs = np.zeros( (oRes) )
     np.add.at( outputs, nAngles, magnitudes )  
+    outputs = convolve_with_edge_wrap( outputs, kern )
 
-    avrgAngle = np.arctan2( np.sum(dy**2), np.sum(dx**2) )
+    avrgAngle = np.arctan2( np.sum(dy**3), np.sum(dx**3) )
     avrgAngle = np.pi*2+avrgAngle if avrgAngle<0 else avrgAngle
     avrgIndex = int(0.5+oRes*avrgAngle/(np.pi*2))
 

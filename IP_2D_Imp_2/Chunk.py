@@ -854,7 +854,7 @@ class Chunk:
         # Apply ratio test
         good_matches = []
         for m, n in matches:
-            if m.distance < 0.9 * n.distance:
+            if m.distance < 0.99 * n.distance:
                 good_matches.append(m)
 
         # Extract keypoints

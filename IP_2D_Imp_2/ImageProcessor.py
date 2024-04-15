@@ -195,21 +195,24 @@ class ImageProcessor:
         y_coords = y_coords - radius
  
         smoothKern = np.array((0.154,0.242,0.398,0.242,0.154)) 
+        gaussian_array = np.array([
+            [0.002969, 0.013306, 0.021938, 0.013306, 0.002969],
+            [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
+            [0.021938, 0.098320, 0.162103, 0.098320, 0.021938],
+            [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
+            [0.002969, 0.013306, 0.021938, 0.013306, 0.002969]
+        ])
         
         intrestMask = (x_coords**2 + y_coords**2) < ((radius+0.5)**2)
-        intrestMask[radius,radius] = 0
- 
-        angleMap = np.arctan2( y_coords, x_coords )+np.pi
-        angleMap = (angleMap*oRes/(2*np.pi) + 0.5 ).astype(int)%oRes
-
-        scaleFactors = np.zeros( (oRes) )
-        np.add.at( scaleFactors, angleMap, intrestMask )
+        intrestMask[radius,radius] = 0  
         
         angleSet = np.arange( 0, np.pi*2, np.pi*2/oRes )
         xVecFlat = np.cos( angleSet )
         yVecFlat = np.sin( angleSet )
-        
-
+         
+        absImage = np.where( np.abs( inpArray )<0.2, 0, np.where( inpArray > 0, 1, -1 ) )
+        gDy, gDx = np.gradient( convolve2d( absImage, gaussian_array, mode="same" ) )
+         
         # Iterates through each search window
         for i in range(0, pointXs.size):
             centX = pointXs[i]
@@ -219,39 +222,41 @@ class ImageProcessor:
             yMin, yMax = centY-radius, centY+radius+1
 
             if ( xMin > 0 and yMin > 0 and xMax < inpArray.shape[1] and yMax < inpArray.shape[0] ): 
-                windowImage = ( inpArray[ yMin:yMax, xMin:xMax ] )  
-                
-                windowImage = np.where( np.abs( windowImage )<0.2, 0, np.where( windowImage > 0, 1, -1 ) )
+                windowAbsImage = ( absImage[ yMin:yMax, xMin:xMax ] )   
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.93 ):
-
-                    extThickness = np.zeros( (oRes) )
-                    np.add.at( extThickness, angleMap, windowImage )
-                    extThickness = extThickness/scaleFactors
-                    extThickness = convolveWithEdgeWrap( extThickness, smoothKern )
+                if ( np.average( np.abs(windowAbsImage) ) > 0.93 ):
+                    dx, dy = ( gDx[ yMin:yMax, xMin:xMax ]*intrestMask ), ( gDy[ yMin:yMax, xMin:xMax ]*intrestMask )
+                     
+                    magnitudes = np.sqrt(dy**2 + dx**2)  
+                    angles = np.mod(np.arctan2( dy, dx ) + 2*np.pi, 2*np.pi) 
+                    nAngles = (angles*oRes/(2*np.pi)).astype(int)
+                    
+                    gradHist = np.zeros( (oRes) )
+                    np.add.at( gradHist, nAngles, magnitudes )  
+                    gradHist = convolveWithEdgeWrap( gradHist, smoothKern )
     
-                    avrgAngle = np.arctan2( np.sum(yVecFlat*(extThickness**3)), np.sum(xVecFlat*(extThickness**3)) )
+                    avrgAngle = np.arctan2( np.sum( dy**3 ), np.sum( dx**3 ) )
                     avrgAngle = np.pi*2+avrgAngle if avrgAngle<0 else avrgAngle
                     avrgIndex = int(0.5+oRes*avrgAngle/(np.pi*2))
                     mainAngle.append( avrgAngle )    
 
-                    alignedThickness = np.roll( extThickness, -avrgIndex )
+                    alignedGradHist = np.roll( gradHist, -avrgIndex )
                     
-                    outputs.append( alignedThickness )
+                    outputs.append( alignedGradHist )
                     positions.append( ( pointXs[i], pointYs[i] ) )
 
                 
                 #     plt.figure( 415 )
                 #     plt.clf()
-                #     plt.imshow( windowImage + np.where( intrestMask,0, np.inf), origin="lower" )  
+                #     plt.imshow( windowAbsImage + np.where( intrestMask,0, np.inf), origin="lower" )  
                 #     plt.figure( 4135 )
                 #     plt.clf()
-                #     plt.plot( alignedThickness ) 
+                #     plt.plot( alignedGradHist ) 
                 #     plt.show( block=False )
                 # else:
                 #     plt.figure( 415 )
-                #     plt.imshow( windowImage, origin="lower" )  
+                #     plt.imshow( windowAbsImage, origin="lower" )  
                 #     plt.figure( 4135 )
                 #     plt.clf() 
                 #     plt.show( block=False ) 

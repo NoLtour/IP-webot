@@ -558,9 +558,11 @@ def method2Tester( inpChunk:Chunk ):
 
     "4"      
 
-def mapMergeTest( index0, frameCount ):
+def mapMergeTest( index0, frameCount, skipping=0 ):
     rawStack = []
     chunkStack = []
+    
+    skipdex = 0
     
     for i in range( 0, len(allScanData) ):
         cRawScan:RawScanFrame = allScanData[i]
@@ -569,7 +571,7 @@ def mapMergeTest( index0, frameCount ):
         
         midScan = rawStack[int(len(rawStack)/2)]
         if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
-            if ( index0<=0 ):
+            if ( index0<=0 and skipdex<=0 ):
                 # Frame merge 
                 nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
                 rawStack = [ rawStack[-1] ] 
@@ -581,10 +583,16 @@ def mapMergeTest( index0, frameCount ):
                 lpWindow.render()  
 
                 chunkStack.append( nChunk )
+                
+                skipdex = skipping
             else:
                 index0 -= 1
+                skipdex -= 1
+                
                 rawStack = []
-                chunkStack = []
+                    
+                if ( index0 > 0 ):
+                    chunkStack = []
         
         if ( len( chunkStack ) > frameCount or len(allScanData)-1==i ):
             """fancyPlot( chunkStack[12].cachedProbabilityGrid.mapEstimate )
@@ -640,13 +648,13 @@ def getChunk( index ):
         if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
             # Frame merge 
             nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
-            rawStack = [ rawStack[-1] ] 
 
             if ( len( chunkStack ) == index  ):
                 nChunk.constructProbabilityGrid() 
     
                 return nChunk 
 
+            rawStack = [ rawStack[-1] ] 
             chunkStack.append( nChunk )
         
 
@@ -771,13 +779,13 @@ def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
 
 testingChunk = getChunk( 2 )
 
-descriptorTest( getChunk( 45 ), getChunk( 49 ) )
+descriptorTest( getChunk( 0 ), getChunk( 223 ) )
 
 #showRotateTest( testingChunk )
 
 featurelessAutoTune( testingChunk )
 
-mapMergeTest( 10, 50 )
+mapMergeTest( 35, 30, 3 )
 
 conf = testingChunk.config
 #conf.FEATURELESS_X_ERROR_SCALE,conf.FEATURELESS_Y_ERROR_SCALE,conf.FEATURELESS_A_ERROR_SCALE = 0.063324, 0.061625, 0.055572

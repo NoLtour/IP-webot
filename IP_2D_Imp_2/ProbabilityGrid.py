@@ -336,9 +336,11 @@ class ProbabilityGrid:
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 2, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 30 )
+        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 30 )
+        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 30 )
 
         plt.figure( 415 )
+        plt.clf()
         plt.imshow( this.mapEstimate, origin="lower" )
         plt.plot(  intrestPoints[:,0], intrestPoints[:,1], "rx" )
         plt.show( block=False )

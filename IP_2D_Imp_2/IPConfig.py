@@ -7,8 +7,8 @@ class IPConfig:
     OBJECT_DIAMETER = 0.5
     OBJECT_PIX_RADI = int(GRID_RESOLUTION*OBJECT_DIAMETER/2)
     OBJECT_PIX_DIAM = OBJECT_PIX_RADI*2 + 1
-    MAX_FRAMES_MERGE = 5
-    MAX_INTER_FRAME_ANGLE = np.rad2deg(5)
+    MAX_FRAMES_MERGE = 1
+    MAX_INTER_FRAME_ANGLE = np.deg2rad(5)
 
     # Featureless adjuster
     FEATURELESS_SEARCH_DIST = 0.14 # Given in generic distance
@@ -33,7 +33,7 @@ class IPConfig:
 
     # Image estimation
     IE_OBJECT_DIAM = 0.5 *OBJECT_DIAMETER
-    IE_SHARPNESS   = 2.6
+    IE_SHARPNESS   = 4.6
 
     # Corner detector
     CORN_PEAK_SEARCH_RADIUS = int( OBJECT_PIX_RADI*0.5 + 0.5 )
