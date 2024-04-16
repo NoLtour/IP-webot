@@ -3,7 +3,7 @@ from __future__ import annotations
 from RawScanFrame import RawScanFrame
 from scipy.spatial import KDTree 
 from ProbabilityGrid import ProbabilityGrid
-from CommonLib import gaussianKernel, fancyPlot, solidCircle, generate1DGuassianDerivative
+from CommonLib import gaussianKernel, fancyPlot, solidCircle, generate1DGuassianDerivative, rotationMatrix
 
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
@@ -12,6 +12,9 @@ from scipy.optimize import differential_evolution
 from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
+
+from skimage.transform import EuclideanTransform
+from skimage.measure import ransac
 
 from IPConfig import IPConfig
 
@@ -840,38 +843,162 @@ class Chunk:
 
         thisKeypoints, thisDescriptors = this.cachedProbabilityGrid.asKeypoints, this.cachedProbabilityGrid.featureDescriptors
         otherKeypoints, otherDescriptors = otherChunk.cachedProbabilityGrid.asKeypoints, otherChunk.cachedProbabilityGrid.featureDescriptors
+        
+        transSet = this.getLocalOffsetFromTarget( otherChunk )
+        transRotation = rotationMatrix( -transSet[2] )
+        transVector = np.array((transSet[0], transSet[1]))*this.cachedProbabilityGrid.cellRes
+        
+        origin1 = np.array(( this.cachedProbabilityGrid.xAMin, this.cachedProbabilityGrid.yAMin ))
+        origin2 = np.array(( otherChunk.cachedProbabilityGrid.xAMin, otherChunk.cachedProbabilityGrid.yAMin ))
 
+        if ( True ):
+            rawKP1 = np.array([ keyPoint.pt for keyPoint in thisKeypoints ]) 
+            rawKP2 = np.array([ keyPoint.pt for keyPoint in otherKeypoints ]) 
+            
+            trnsKP2 = np.dot(rawKP2 + origin2, transRotation) + ( transVector - origin1 )
+            
+            plt.figure(1934)
+            plt.imshow( this.cachedProbabilityGrid.mapEstimate, origin="lower" )
+            plt.plot( rawKP1[:,0], rawKP1[:,1], "rx" )
+            plt.plot( trnsKP2[:,0], trnsKP2[:,1], "bx" )
+            plt.show(block=False)
+            ""
+        
+        if ( True ):
+            # Draw keypoints on the image
+            image_with_keypoints = cv2.drawKeypoints(image1, thisKeypoints, None, color=(0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS) 
+            # Draw lines representing angles of keypoints
+            for kp in thisKeypoints:
+                angle = kp.angle
+                x, y = kp.pt
+                # Calculate endpoint for the line
+                endpoint_x = int(x + 10 * np.cos((angle)))
+                endpoint_y = int(y + 10 * np.sin((angle)))
+                # Draw the line
+                cv2.line(image_with_keypoints, (int(x), int(y)), (endpoint_x, endpoint_y), (0, 0, 255), 1)
+                # Draw an 'x' at the keypoint
+                cv2.drawMarker(image_with_keypoints, (int(x), int(y)), (0, 0, 255), markerType=cv2.MARKER_CROSS, markerSize=5, thickness=1) 
+            # Display the image
+            cv2.imshow('Image 1 with keypoints and angles', image_with_keypoints)
+            
+            # Draw keypoints on the image
+            image_with_keypoints = cv2.drawKeypoints(image2, otherKeypoints, None, color=(0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS) 
+            # Draw lines representing angles of keypoints
+            for kp in otherKeypoints:
+                angle = kp.angle
+                x, y = kp.pt
+                # Calculate endpoint for the line
+                endpoint_x = int(x + 10 * np.cos((angle)))
+                endpoint_y = int(y + 10 * np.sin((angle)))
+                # Draw the line
+                cv2.line(image_with_keypoints, (int(x), int(y)), (endpoint_x, endpoint_y), (0, 0, 255), 1)
+                # Draw an 'x' at the keypoint
+                cv2.drawMarker(image_with_keypoints, (int(x), int(y)), (0, 0, 255), markerType=cv2.MARKER_CROSS, markerSize=5, thickness=1) 
+            # Display the image
+            cv2.imshow('Image 2 with keypoints and angles', image_with_keypoints)
+        
         ""
 
         # Perform keypoint matching
         FLANN_INDEX_KDTREE = 0
         index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)  # or pass empty dictionary
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
-
-        matches = flann.knnMatch(thisDescriptors, otherDescriptors, k=2)
-
-        # Apply ratio test
-        good_matches = []
-        for m, n in matches:
-            if m.distance < 0.99 * n.distance:
-                good_matches.append(m)
-
+        search_params = dict(checks=150)  # or pass empty dictionary
+         
+        kVal = 3
+        
+        #flann = cv2.FlannBasedMatcher(index_params, search_params)
+        #matches = flann.knnMatch(thisDescriptors, otherDescriptors, k=kVal)
+        
+        bf = cv2.BFMatcher() 
+        matches = bf.knnMatch(thisDescriptors, otherDescriptors, k=kVal)  
+        
         # Extract keypoints
-        src_pts = np.float32([thisKeypoints[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-        dst_pts = np.float32([otherKeypoints[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-
+        src_I   = []
+        src_pts = []
+        #np.float32([thisKeypoints[m.queryIdx].pt for m, n in matches]).reshape(-1, 1, 2)
+        dst_pts = [] 
+        flatMatches = []
+        #np.float32([otherKeypoints[m.trainIdx].pt for m, n in matches]).reshape(-1, 1, 2)
+        
+        offSetScale = 0
+        
+        for matchSet in matches:
+            for match in matchSet:
+                srcKeypoint = thisKeypoints[match.queryIdx]
+                dstKeypoint = otherKeypoints[match.trainIdx]
+                
+                #src_pts.append( (srcKeypoint.pt[0] + offSetScale*np.cos( srcKeypoint.angle ), srcKeypoint.pt[1] + offSetScale*np.sin( srcKeypoint.angle )) )
+                #dst_pts.append( (dstKeypoint.pt[0] + offSetScale*np.cos( dstKeypoint.angle ), dstKeypoint.pt[1] + offSetScale*np.sin( dstKeypoint.angle )) )
+                src_I.append( match.queryIdx )
+                src_pts.append( srcKeypoint.pt )
+                dst_pts.append( dstKeypoint.pt )
+                flatMatches.append( match )
+                
+        src_pts = np.float32(src_pts).reshape(-1, 2)
+        dst_pts = np.float32(dst_pts).reshape(-1, 2) 
+        
+        dst_ptsInFrame = np.dot(dst_pts + origin2, transRotation) + ( transVector - origin1 )
+        
+        sepsSquared = np.sum( (src_pts - dst_ptsInFrame)**2, axis=1)
+        
+        src_pts_filt = []
+        dst_pts_filt = []
+        flat_match_filt = []
+        
+        # This is a disgusting design, but it works
+        listIndx = 0
+        while ( listIndx < len(src_I) ):
+            targQIdx = src_I[listIndx]
+            
+            bestSeperation = 99999999999
+            bestSepIndex   = -1
+            
+            while (listIndx < len(src_I) and targQIdx == src_I[listIndx]):
+                if ( sepsSquared[listIndx] < bestSeperation ):
+                    bestSeperation = sepsSquared[listIndx]
+                    bestSepIndex = listIndx
+                listIndx += 1
+                
+            src_pts_filt.append( src_pts[ bestSepIndex ] )
+            dst_pts_filt.append( dst_pts[ bestSepIndex ] )
+            flat_match_filt.append( flatMatches[ bestSepIndex ] )
+                
+        src_pts_filt = np.array(src_pts_filt)
+        dst_pts_filt = np.array(dst_pts_filt)
+            
+        
         # Apply RANSAC to estimate affine transformation
-        affine_matrix, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, ransacReprojThreshold=5.0)
-
-        # Filter out outliers
-        filtered_matches = [m for i, m in enumerate(good_matches) if inliers[i]]
+        #affine_matrix, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, ransacReprojThreshold=10.0, method=cv2.RANSAC )  
+        
+        model = EuclideanTransform()
+        model.estimate( src_pts_filt, dst_pts_filt )
+        
+        model_robust, inliers = ransac(
+            (src_pts_filt, dst_pts_filt), EuclideanTransform, min_samples=2, residual_threshold=2, max_trials=100
+        )
+        
+        accRotation = np.rad2deg( model_robust.rotation )
+        accTrans = model_robust.translation
+        
+        #tform = transform.estimate_transform('euclidean', src_pts.reshape(-1, 2), dst_pts.reshape(-1, 2)  )
+ 
+        #x_translation = affine_matrix[0, 2]
+        #y_translation = affine_matrix[1, 2]
+        #angle = np.arctan2(affine_matrix[1, 0], affine_matrix[0, 0]) * 180.0 / np.pi
+ 
+        inMatches = [flat_match_filt[i] for i, inlier in enumerate(inliers) if inlier]
+        
+        
 
         # Draw filtered matches
-        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, filtered_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-
+        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, inMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
         # Display the matched image
         cv2.imshow('Matches', matched_image)
+
+        # Draw filtered matches
+        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flatMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
+        # Display the matched image
+        cv2.imshow('Matches flat', matched_image)
 
         ""
 

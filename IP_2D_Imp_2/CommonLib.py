@@ -10,6 +10,13 @@ import matplotlib.pyplot as plt
     )
     return kernel / np.sum(kernel)"""
 
+def rotationMatrix(theta):
+    """ Generate a 2x2 rotation matrix for a given angle theta (in radians). """
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    return np.array([[cos_theta, -sin_theta],
+                     [sin_theta, cos_theta]])
+
 def solidCircle(diameter):
     return np.fromfunction(
         lambda x, y: np.where( diameter**2//4 < (x-diameter//2)**2+(y-diameter//2)**2, 1, 0 )

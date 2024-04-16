@@ -771,6 +771,8 @@ def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
     
     #fancyPlot( inpChunk2.cachedProbabilityGrid.mapEstimate )
     #plt.show()
+    parent:Chunk = Chunk.initEmpty( config )
+    parent.addChunks([ inpChunk1, inpChunk2 ])
 
     inpChunk1.determineErrorKeypoints( inpChunk2 )
 
@@ -779,7 +781,8 @@ def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
 
 testingChunk = getChunk( 2 )
 
-descriptorTest( getChunk( 0 ), getChunk( 223 ) )
+descriptorTest( getChunk( 220 ), getChunk( 290 ) )
+#descriptorTest( getChunk( 0 ), getChunk( 2 ) )
 
 #showRotateTest( testingChunk )
 

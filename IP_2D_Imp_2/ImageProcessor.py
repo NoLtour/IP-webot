@@ -4,6 +4,7 @@ import numpy as np
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
 from CommonLib import solidCircle, gaussianKernel, convolveWithEdgeWrap
+import random
 
 import matplotlib.pyplot as plt
 
@@ -41,7 +42,7 @@ class ImageProcessor:
         localIntensities = inpArray[ localMaximums ]
   
         if ( threshHold == -1 ):
-            threshHold = np.max( np.abs(localIntensities) ) * 0.1
+            threshHold = np.max( np.abs(localIntensities) ) * 0.2
         
         mask = np.where( np.abs(localIntensities) > threshHold )
  
@@ -145,7 +146,7 @@ class ImageProcessor:
                 windowImage = np.where( np.abs( windowImage )<0.2, 0, np.where( windowImage > 0, 1, -1 ) )
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.93 ):
+                if ( np.average( np.abs(windowImage) ) > 0.96 ):
 
                     extThickness = np.zeros( (oRes) )
                     np.add.at( extThickness, angleMap, windowImage )
@@ -202,6 +203,11 @@ class ImageProcessor:
             [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
             [0.002969, 0.013306, 0.021938, 0.013306, 0.002969]
         ])
+        # gaussian_array = np.array([ 
+        #     [0.059634, 0.098320, 0.059634],
+        #     [0.098320, 0.162103, 0.098320],
+        #     [0.059634, 0.098320, 0.059634] 
+        # ])
         
         intrestMask = (x_coords**2 + y_coords**2) < ((radius+0.5)**2)
         intrestMask[radius,radius] = 0  
@@ -210,7 +216,7 @@ class ImageProcessor:
         xVecFlat = np.cos( angleSet )
         yVecFlat = np.sin( angleSet )
          
-        absImage = np.where( np.abs( inpArray )<0.2, 0, np.where( inpArray > 0, 1, -1 ) )
+        absImage = np.where( np.abs( inpArray )<0.4, 0, np.where( inpArray > 0, 1, -1 ) )
         gDy, gDx = np.gradient( convolve2d( absImage, gaussian_array, mode="same" ) )
          
         # Iterates through each search window
@@ -236,7 +242,7 @@ class ImageProcessor:
                     np.add.at( gradHist, nAngles, magnitudes )  
                     gradHist = convolveWithEdgeWrap( gradHist, smoothKern )
     
-                    avrgAngle = np.arctan2( np.sum( dy**3 ), np.sum( dx**3 ) )
+                    avrgAngle = np.arctan2( np.sum( dy**3 ), np.sum( dx**3 ) ) + np.pi
                     avrgAngle = np.pi*2+avrgAngle if avrgAngle<0 else avrgAngle
                     avrgIndex = int(0.5+oRes*avrgAngle/(np.pi*2))
                     mainAngle.append( avrgAngle )    
@@ -263,6 +269,53 @@ class ImageProcessor:
                 # ""
         
         return np.array(outputs), np.array(positions), np.array( mainAngle )
+    
+    @staticmethod
+    def structuralCombine(  descriptors:np.ndarray, positions:np.ndarray, angles:np.ndarray, minSeperation, minAngleDifference ):
+        """ 
+            Positions in format   [ [x,y], [x,y] ... ]
+            Descriptors in format [ [...], [...] ... ] (floats)
+            Angles in format      [ a, a ... ]
+        
+            This function iterates through each point, then it finds other points which are above minSeperation and have an angle difference of greater than minAngleDifference
+            from this set it then selects 4 at random (if enough exist). Now it generates a new set of points which hold the following data from it's two parents:
+                - Exist at the midpoint
+                - Angle is from parent 1
+                - Descriptor is the result of summing parent 1 and 2's descriptor then multiplying by the positional seperation
+            
+            After doing this the new points: position, descriptors and angles are returned
+        """
+        
+        new_positions = []
+        new_descriptors = []
+        new_angles = []
+
+        for i, pos in enumerate(positions):
+            # Find candidate points for combination
+            candidates = []
+            for j, other_pos in enumerate(positions):
+                if i != j:
+                    separation = np.linalg.norm(pos - other_pos)
+                    angle_difference = np.abs(angles[i] - angles[j])
+                    angle_difference = min( 2*np.pi-angle_difference, angle_difference )
+                    if separation > minSeperation and angle_difference > minAngleDifference:
+                        candidates.append(j)
+
+            # Select 4 random candidates if enough exist
+            if len(candidates) >= 30:
+                selected_candidates = random.sample(candidates, 30)
+            else:
+                selected_candidates = candidates
+
+            # Generate new points
+            for candidate_index in selected_candidates:
+                mid_point = (pos + positions[candidate_index]) / 2
+                new_positions.append(mid_point)
+                new_descriptors.append((descriptors[i] - descriptors[candidate_index]) * np.linalg.norm(pos - positions[candidate_index]))
+                new_angles.append(angles[i])
+
+        return  np.array(new_descriptors), np.array(new_positions), np.array(new_angles)
+        
         
         
     
