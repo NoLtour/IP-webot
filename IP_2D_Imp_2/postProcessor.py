@@ -24,7 +24,10 @@ print("imported")
 
 # Noise step
 np.random.seed(3115)
-for cScan in allScanData:
+for i in range(0,len(allScanData)):
+    cScan = allScanData[i]
+    
+    cScan.index = i
     #cScan.scanDistances = cScan.scanDistances + 0.01*(np.random.random( cScan.scanDistances.size )-0.5)
     #cScan.pose = cScan.truePose # TODO remove
     ""
@@ -633,8 +636,73 @@ def mapMergeTest( index0, frameCount, skipping=0 ):
             plt.show(block=False)
 
             return
- 
-         
+
+def mapMergeTestKeypoints( index0, frameCount, skipping=0 ):
+    rawStack = []
+    chunkStack = []
+    
+    skipdex = 0
+    
+    for i in range( 0, len(allScanData) ):
+        cRawScan:RawScanFrame = allScanData[i]
+
+        rawStack.append( cRawScan )
+        
+        midScan = rawStack[int(len(rawStack)/2)]
+        if ( abs(cRawScan.pose.yaw - midScan.pose.yaw) > config.MAX_INTER_FRAME_ANGLE or len(rawStack) > config.MAX_FRAMES_MERGE ):
+            if ( index0<=0 and skipdex<=0 ):
+                # Frame merge 
+                nChunk = Chunk.initFromRawScans( rawStack[0:-1], config, 0 )
+                rawStack = [ rawStack[-1] ] 
+
+                nChunk.constructProbabilityGrid() 
+
+                gridDisp2.parseData( nChunk.cachedProbabilityGrid.mapEstimate ) 
+                
+                lpWindow.render()  
+
+                chunkStack.append( nChunk )
+                
+                skipdex = skipping
+            else:
+                index0 -= 1
+                skipdex -= 1
+                
+                rawStack = []
+                    
+                if ( index0 > 0 ):
+                    chunkStack = []
+        
+        if ( len( chunkStack ) > frameCount or len(allScanData)-1==i ):
+            """fancyPlot( chunkStack[12].cachedProbabilityGrid.mapEstimate )
+            fancyPlot( chunkStack[32].cachedProbabilityGrid.mapEstimate )
+            plt.show()"""
+
+            parentChunk = Chunk.initEmpty( config )
+
+            parentChunk.addChunks( chunkStack )
+
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
+            parentChunk.centredHybridErrorReduction(   ) 
+             
+
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
+            
+            parentChunk.centredPrune( 1.2, 2.5 ) 
+            
+            fancyPlot(
+                parentChunk.constructProbabilityGrid().mapEstimate
+            )
+            plt.show(block=False)
+
+            return
+
 def getChunk( index ):
     rawStack = []
     chunkStack = []
@@ -774,19 +842,21 @@ def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
     parent:Chunk = Chunk.initEmpty( config )
     parent.addChunks([ inpChunk1, inpChunk2 ])
 
-    inpChunk1.determineErrorKeypoints( inpChunk2 )
+    inpChunk1.determineErrorKeypoints( inpChunk2, np.array((0,0,0)) )
 
 
 #plotPathError()
 
 testingChunk = getChunk( 2 )
 
-descriptorTest( getChunk( 220 ), getChunk( 290 ) )
+#descriptorTest( getChunk( 13 ), getChunk( 90 ) )
 #descriptorTest( getChunk( 0 ), getChunk( 2 ) )
 
 #showRotateTest( testingChunk )
 
 featurelessAutoTune( testingChunk )
+
+mapMergeTestKeypoints( 85, 10, 4  ) 
 
 mapMergeTest( 35, 30, 3 )
 

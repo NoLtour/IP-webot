@@ -217,6 +217,36 @@ class Chunk:
         
         return this.offsetFromParent.copy()
 
+    def extractAllChildRawLimitIndecies( this, minIndex = 99999999999999, maxIndex = -999999999999999, minScan=None, maxScan=None ):
+        """ returns the maximum and minimum raw indicies assosiated with this scan stack """
+        
+        if ( this.isScanWrapper ):
+            centScan = this.rawScans[ this.centreScanIndex ]
+            
+            if ( minIndex > centScan.index ):
+                minIndex = centScan.index
+                minScan = centScan
+            if ( maxIndex < centScan.index ):
+                maxIndex = centScan.index
+                maxScan = centScan
+             
+            return minIndex, maxIndex, minScan, maxScan
+        
+        for subChunk in this.subChunks:
+            minIndex, maxIndex, minScan, maxScan = subChunk.extractAllChildRawLimitIndecies(minIndex, maxIndex, minScan, maxScan)
+            
+        return minIndex, maxIndex, minScan, maxScan
+    
+    def findNearestRawScans( this, otherRoot:Chunk ):
+        thisMaxIndx, thisMinIndx, thisMinScan, thisMaxScan = this.extractAllChildRawLimitIndecies()
+        otherMaxIndx, otherMinIndx, otherMinScan, otherMaxScan = otherRoot.extractAllChildRawLimitIndecies()
+        
+        thisClosestScan, otherClosestScan = thisMinScan, otherMaxScan if abs(otherMaxIndx - thisMinIndx)<abs(thisMaxIndx - otherMinIndx) else thisMaxScan, otherMinScan
+        
+        ""
+        
+        
+    
     def determineInitialOffset( this ):
         """ This makes the initial estimation of this chunks offset from it's parent, returning a pose representing the offset
           the returned pose is interms of the parent's orientation (forward, upward, alignedYaw)
@@ -225,6 +255,8 @@ class Chunk:
         # TODO current implementation only makes use of first raw position data
         parentCentre = this.parent.getRawCentre().pose
         thisCentre = this.getRawCentre().pose
+        
+        #this.findNearestRawScans(  )
         
         X = thisCentre.x - parentCentre.x
         Y = thisCentre.y - parentCentre.y
@@ -748,6 +780,30 @@ class Chunk:
             
         return offsetAdjustment, newErrorScore
     
+    def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+        """ This finds the relative offset between two chunks using features  """
+          
+        initErrorScore = ( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
+        
+        newOffset, wasSuccess = this.determineErrorKeypoints( otherChunk, forcedOffset )
+        if ( not wasSuccess ):
+            return np.nan, np.nan
+        
+        newErrorScore, overlapRegion  = this.determineDirectDifference( otherChunk, newOffset, True )
+        
+        if ( newErrorScore > initErrorScore or overlapRegion<10 ):
+            return np.nan, np.nan
+        
+        if ( updateOffset ):
+            # this is found in parent refrance frame
+            toTargetVector = this.getNormalOffsetFromLocal( this.getLocalOffsetFromTarget( otherChunk ) + newOffset )
+            
+            targetNewPosition = toTargetVector + this.getOffset()
+            
+            otherChunk.updateOffset( targetNewPosition )
+            
+        return newOffset, newErrorScore
+    
     def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
         """ determines the error between two images without using features """
         
@@ -778,7 +834,7 @@ class Chunk:
 
         return errorScore, mArea
         
-    def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3) ):
+    def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), offsetTotalOverwrite=False ):
         """ determines the error between two images without using features """
 
         transOffset = otherChunk.getOffset()
@@ -787,6 +843,8 @@ class Chunk:
         toTransVector = transOffset - myOffset
 
         toTransVector += forcedOffset
+        if ( offsetTotalOverwrite ):
+            toTransVector = forcedOffset
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, toTransVector[2], (toTransVector[0],toTransVector[1]) )
@@ -796,14 +854,14 @@ class Chunk:
         mArea = np.sum(np.abs(errorWindow) ) 
         if (mArea<10): return np.nan, np.nan
 
-        errorWindow = -np.minimum( errorWindow, 0 ) 
+        #errorWindow = -np.minimum( errorWindow, 0 ) 
 
         errorScore = 1000*np.sum(errorWindow)/mArea
 
         """fancyPlot( thisWindow )
         fancyPlot( transWindow )
         fancyPlot( errorWindow )"""
-        fancyPlot( (thisWindow-transWindow) ) 
+        fancyPlot( errorWindow ) 
 
         return errorScore, mArea
  
@@ -833,8 +891,7 @@ class Chunk:
 
         return thisWindow, transWindow
 
-    def determineErrorKeypoints( this, otherChunk:Chunk ):
-
+    def determineErrorKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ): 
         this.cachedProbabilityGrid.extractDescriptors()
         otherChunk.cachedProbabilityGrid.extractDescriptors()
 
@@ -844,14 +901,15 @@ class Chunk:
         thisKeypoints, thisDescriptors = this.cachedProbabilityGrid.asKeypoints, this.cachedProbabilityGrid.featureDescriptors
         otherKeypoints, otherDescriptors = otherChunk.cachedProbabilityGrid.asKeypoints, otherChunk.cachedProbabilityGrid.featureDescriptors
         
-        transSet = this.getLocalOffsetFromTarget( otherChunk )
+        transSet = this.getLocalOffsetFromTarget( otherChunk ) + forcedOffset 
+        
         transRotation = rotationMatrix( -transSet[2] )
         transVector = np.array((transSet[0], transSet[1]))*this.cachedProbabilityGrid.cellRes
         
         origin1 = np.array(( this.cachedProbabilityGrid.xAMin, this.cachedProbabilityGrid.yAMin ))
         origin2 = np.array(( otherChunk.cachedProbabilityGrid.xAMin, otherChunk.cachedProbabilityGrid.yAMin ))
-
-        if ( True ):
+ 
+        if ( showPlot ):
             rawKP1 = np.array([ keyPoint.pt for keyPoint in thisKeypoints ]) 
             rawKP2 = np.array([ keyPoint.pt for keyPoint in otherKeypoints ]) 
             
@@ -864,7 +922,7 @@ class Chunk:
             plt.show(block=False)
             ""
         
-        if ( True ):
+        if ( showPlot ):
             # Draw keypoints on the image
             image_with_keypoints = cv2.drawKeypoints(image1, thisKeypoints, None, color=(0, 255, 0), flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS) 
             # Draw lines representing angles of keypoints
@@ -904,10 +962,7 @@ class Chunk:
         index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
         search_params = dict(checks=150)  # or pass empty dictionary
          
-        kVal = 3
-        
-        #flann = cv2.FlannBasedMatcher(index_params, search_params)
-        #matches = flann.knnMatch(thisDescriptors, otherDescriptors, k=kVal)
+        kVal = 5
         
         bf = cv2.BFMatcher() 
         matches = bf.knnMatch(thisDescriptors, otherDescriptors, k=kVal)  
@@ -915,20 +970,23 @@ class Chunk:
         # Extract keypoints
         src_I   = []
         src_pts = []
-        #np.float32([thisKeypoints[m.queryIdx].pt for m, n in matches]).reshape(-1, 1, 2)
+        
         dst_pts = [] 
         flatMatches = []
-        #np.float32([otherKeypoints[m.trainIdx].pt for m, n in matches]).reshape(-1, 1, 2)
+        
         
         offSetScale = 0
         
         for matchSet in matches:
+            prevScore = 99999999999999
             for match in matchSet:
+                if (  match.distance*0.85 > prevScore or match.distance>10 ):#
+                    break
+                prevScore = match.distance
+                
                 srcKeypoint = thisKeypoints[match.queryIdx]
                 dstKeypoint = otherKeypoints[match.trainIdx]
                 
-                #src_pts.append( (srcKeypoint.pt[0] + offSetScale*np.cos( srcKeypoint.angle ), srcKeypoint.pt[1] + offSetScale*np.sin( srcKeypoint.angle )) )
-                #dst_pts.append( (dstKeypoint.pt[0] + offSetScale*np.cos( dstKeypoint.angle ), dstKeypoint.pt[1] + offSetScale*np.sin( dstKeypoint.angle )) )
                 src_I.append( match.queryIdx )
                 src_pts.append( srcKeypoint.pt )
                 dst_pts.append( dstKeypoint.pt )
@@ -936,6 +994,9 @@ class Chunk:
                 
         src_pts = np.float32(src_pts).reshape(-1, 2)
         dst_pts = np.float32(dst_pts).reshape(-1, 2) 
+        
+        if ( src_pts.size < 3 or dst_pts.size < 3 ):
+            return False, False
         
         dst_ptsInFrame = np.dot(dst_pts + origin2, transRotation) + ( transVector - origin1 )
         
@@ -965,10 +1026,9 @@ class Chunk:
                 
         src_pts_filt = np.array(src_pts_filt)
         dst_pts_filt = np.array(dst_pts_filt)
-            
         
-        # Apply RANSAC to estimate affine transformation
-        #affine_matrix, inliers = cv2.estimateAffinePartial2D(src_pts, dst_pts, ransacReprojThreshold=10.0, method=cv2.RANSAC )  
+        if ( src_pts_filt.size < 3 or dst_pts_filt.size < 3 ):
+            return False, False
         
         model = EuclideanTransform()
         model.estimate( src_pts_filt, dst_pts_filt )
@@ -977,30 +1037,46 @@ class Chunk:
             (src_pts_filt, dst_pts_filt), EuclideanTransform, min_samples=2, residual_threshold=2, max_trials=100
         )
         
-        accRotation = np.rad2deg( model_robust.rotation )
-        accTrans = model_robust.translation
+        if ( (inliers is None) or np.sum(inliers) < 4 ):
+            return False, False
         
-        #tform = transform.estimate_transform('euclidean', src_pts.reshape(-1, 2), dst_pts.reshape(-1, 2)  )
- 
-        #x_translation = affine_matrix[0, 2]
-        #y_translation = affine_matrix[1, 2]
-        #angle = np.arctan2(affine_matrix[1, 0], affine_matrix[0, 0]) * 180.0 / np.pi
+        accRotation = -( model_robust.rotation )
+        accTrans = -model_robust.translation
+        
+        newTransVector = ( origin1+np.dot(accTrans-origin2, rotationMatrix(-accRotation)) )/ this.cachedProbabilityGrid.cellRes
+        newTransVector = np.array(( newTransVector[0], newTransVector[1], accRotation ))
+        
+        if ( False ): 
+            rawKP1 = np.array([ keyPoint.pt for keyPoint in thisKeypoints ]) 
+            rawKP2 = np.array([ keyPoint.pt for keyPoint in otherKeypoints ]) 
+            
+            trnsKP2 = np.dot(rawKP2 + origin2, rotationMatrix(-newTransVector[2])) + ( newTransVector[0:2]*this.cachedProbabilityGrid.cellRes - origin1 )
+            
+            plt.figure(1937)
+            plt.imshow( this.cachedProbabilityGrid.mapEstimate, origin="lower" )
+            plt.plot( rawKP1[:,0], rawKP1[:,1], "rx" )
+            plt.plot( trnsKP2[:,0], trnsKP2[:,1], "bx" )
+            plt.show(block=False)
+            ""
  
         inMatches = [flat_match_filt[i] for i, inlier in enumerate(inliers) if inlier]
         
-        
+        if ( showPlot ):
+            this.plotDifference( otherChunk, transSet, True )
+            this.plotDifference( otherChunk, newTransVector, True )
+            plt.show(block=False)
+            
+            # Draw filtered matches
+            matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, inMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
+            # Display the matched image
+            cv2.imshow('Matches', matched_image)
 
-        # Draw filtered matches
-        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, inMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
-        # Display the matched image
-        cv2.imshow('Matches', matched_image)
+            # Draw filtered matches
+            matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flat_match_filt, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
+            # Display the matched image
+            cv2.imshow('Matches flat', matched_image)
 
-        # Draw filtered matches
-        matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flatMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
-        # Display the matched image
-        cv2.imshow('Matches flat', matched_image)
-
-        ""
+        return newTransVector, True
 
 
 
@@ -1040,7 +1116,52 @@ class Chunk:
                 rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
                 
                 rootChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+    
+    def centredHybridErrorReduction( this ):
+        centreChunk = this.subChunks[this.centreChunkIndex]
+ 
+        for targetChunk in this.subChunks:
+            if ( targetChunk != centreChunk ):
+                #centreChunk.plotDifference( targetChunk )
+                centreChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True )
+                centreChunk.determineErrorFeaturelessDirect( targetChunk, 4, np.zeros(3), True )
+                #centreChunk.plotDifference( targetChunk )
+                #plt.show(block=False)
+                ""
+     
+    def linearKeypointErrorReduction( this, skipSize ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        for i in range(0, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+            if ( not targetChunk.isCentre ):
+                rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
+                
+                rootChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True )
+    
+    def centredPrune( this, pruneMult=1.5, overlapMult=1.5 ):
+        centreChunk = this.subChunks[this.centreChunkIndex]
+ 
+        errors = []
+        overlaps = []
+
+        for i in range(0, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+                
+            error, overlap = centreChunk.determineDirectDifference( targetChunk ) 
+            errors.append( error )
+            overlaps.append( overlap )
+
+        errors = np.array( errors )
+        overlaps = np.array( overlaps )
         
+        maxError = np.median( errors )*pruneMult
+        minOverlap = np.median( overlap )/overlapMult
+
+        pruneTargets = np.where( (errors>maxError) | (overlaps<minOverlap) )[0]
+
+        this.deleteSubChunks( pruneTargets.tolist() )
 
     def linearPrune( this, skipSize, pruneMult=1.5 ):
         """ sequentially through all children of this chunk, reducing the error using the selected reduction method
@@ -1057,6 +1178,8 @@ class Chunk:
                 error, overlap = rootChunk.determineDirectDifference( targetChunk )
 
                 errors.append( error )
+            else:
+                errors.append(0)
 
         errors = np.array( errors )
         maxError = np.median( errors )*pruneMult

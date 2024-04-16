@@ -143,10 +143,10 @@ class ImageProcessor:
             if ( xMin > 0 and yMin > 0 and xMax < inpArray.shape[1] and yMax < inpArray.shape[0] ): 
                 windowImage = ( inpArray[ yMin:yMax, xMin:xMax ] )  
                 
-                windowImage = np.where( np.abs( windowImage )<0.2, 0, np.where( windowImage > 0, 1, -1 ) )
+                windowImage = np.where( np.abs( windowImage )<0.1, 0, np.where( windowImage > 0, 1, -1 ) )
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.96 ):
+                if ( np.average( np.abs(windowImage) ) > 0.92 ):
 
                     extThickness = np.zeros( (oRes) )
                     np.add.at( extThickness, angleMap, windowImage )
@@ -203,11 +203,11 @@ class ImageProcessor:
             [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
             [0.002969, 0.013306, 0.021938, 0.013306, 0.002969]
         ])
-        # gaussian_array = np.array([ 
-        #     [0.059634, 0.098320, 0.059634],
-        #     [0.098320, 0.162103, 0.098320],
-        #     [0.059634, 0.098320, 0.059634] 
-        # ])
+        gaussian_array = np.array([ 
+            [0.059634, 0.098320, 0.059634],
+            [0.098320, 0.162103, 0.098320],
+            [0.059634, 0.098320, 0.059634] 
+        ])
         
         intrestMask = (x_coords**2 + y_coords**2) < ((radius+0.5)**2)
         intrestMask[radius,radius] = 0  
@@ -216,7 +216,7 @@ class ImageProcessor:
         xVecFlat = np.cos( angleSet )
         yVecFlat = np.sin( angleSet )
          
-        absImage = np.where( np.abs( inpArray )<0.4, 0, np.where( inpArray > 0, 1, -1 ) )
+        absImage = np.where( inpArray < 0, -1, 1 ) 
         gDy, gDx = np.gradient( convolve2d( absImage, gaussian_array, mode="same" ) )
          
         # Iterates through each search window
@@ -229,9 +229,10 @@ class ImageProcessor:
 
             if ( xMin > 0 and yMin > 0 and xMax < inpArray.shape[1] and yMax < inpArray.shape[0] ): 
                 windowAbsImage = ( absImage[ yMin:yMax, xMin:xMax ] )   
+                windowImage = ( inpArray[ yMin:yMax, xMin:xMax ] )   
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowAbsImage) ) > 0.93 ):
+                if ( np.average( np.abs(windowImage) ) > 0.8 ):
                     dx, dy = ( gDx[ yMin:yMax, xMin:xMax ]*intrestMask ), ( gDy[ yMin:yMax, xMin:xMax ]*intrestMask )
                      
                     magnitudes = np.sqrt(dy**2 + dx**2)  

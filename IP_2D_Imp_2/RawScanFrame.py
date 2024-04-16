@@ -14,6 +14,8 @@ class RawScanFrame:
     scanAngles: np.ndarray = field(default_factory=lambda: np.array([], dtype=float)) 
     pose: CartesianPose = field(default_factory=lambda: CartesianPose.zero() ) 
     truePose: CartesianPose = field(default_factory=lambda: CartesianPose.zero() ) 
+    
+    index:int = None
 
     @staticmethod
     def exportScanFrames( scanStack: list[RawScanFrame], fileName:str ):  

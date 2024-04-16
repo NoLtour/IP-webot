@@ -333,14 +333,14 @@ class ProbabilityGrid:
         if ( this.asKeypoints != None ):
             return
         
-        descRad = 8
+        descRad = 12
         extSize = descRad*2+1
 
-        lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 2, 0.02 )  )
+        lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 2.8, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 32 )
-        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 30 ) 
+        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 32 )
+        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 30 ) 
 
         # plt.figure( 415 )
         # plt.clf()
