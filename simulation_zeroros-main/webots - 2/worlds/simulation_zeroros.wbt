@@ -1,0 +1,665 @@
+#VRML_SIM R2023b utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/DryMud.proto"
+
+WorldInfo {
+  info [
+    "Simulation using webots and ZeroROS."
+  ]
+  title "Simulation ZeroROS"
+  basicTimeStep 8
+  lineScale 0.15
+  contactProperties [
+    DEF MaxFric ContactProperties {
+      material1 "roboWheel"
+      coulombFriction [
+        -1
+      ]
+      bounce 0
+    }
+    DEF NoFric ContactProperties {
+      material2 "robo_body"
+      coulombFriction [
+        0
+      ]
+      bounce 0
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.5832904050192258 -0.5852813281318128 0.5632211558107245 4.170388239669003
+  position 2.651664751684275 0.8042772866753021 37.52897242344406
+  follow "MyBot"
+}
+TexturedBackground {
+  skybox FALSE
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  translation 0 0 -0.2
+  floorSize 80 80
+  floorTileSize 2 2
+  wallThickness 0.5
+}
+Solid {
+  translation 5.8605 1.06037 0.13995
+  rotation 0.9659258492009879 -0.25881895959354084 -5.170949192718539e-07 3.14159
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 15.1927 1.2619 0.13995
+  rotation 0.8436103301047868 -0.22604408845106913 0.4870581905859073 2.88204
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(3)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 13.0597 9.83318 0.13995
+  rotation 0.2505628966821648 -0.2505608966829895 0.9351136144125264 1.63784
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(5)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -3.7603 13.5832 0.13995
+  rotation -0.7040640782904374 0.7040610782901038 -0.09269181030713339 -2.9567353071795863
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(6)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -11.3429 -3.93638 -0.0600221
+  rotation -0.04619810228667654 0.6217890307768138 -0.7818210386979494 -3.0492653071795863
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(4)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -0.67756 -9.15591 -0.390463
+  rotation 0.5782307140502377 0.2180028921920374 0.7862086111998896 2.33619
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(1)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -0.0298962 -8.68144 0.00446177
+  rotation 0.6606761886412473 0.5994951711723818 0.4517881289979534 -3.115735307179586
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock2-1(2)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 0.840735 -2.03427 0.13995
+  rotation -0.037258906619227726 0.348330061882546 0.9366311663971263 -0.8142753071795861
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -6.31199 -9.04954 0.445401
+  rotation 0.36504201146852316 0.9291380291907252 -0.05870990184448872 -3.079595307179586
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(9)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 3.1101 1.16062 0.513603
+  rotation 0.4111771340614481 -0.7307282382488658 0.5449491776768937 -2.4600453071795862
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(6)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 7.18518 -1.72523 0.13995
+  rotation -0.7409511760670623 -0.56855213510108 0.3574070849281538 1.71777
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(1)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -2.20234 3.69477 0.13995
+  rotation -0.12942903676005194 -0.12943003676033596 -0.9831052792186517 1.58783
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(2)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -8.47234 6.47218 -0.159029
+  rotation -0.27200803889864844 0.1591620227610463 0.9490411357181119 2.95833
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(11)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -6.78034 6.02186 0.0421425
+  rotation -0.11714300699138773 0.332305019832795 -0.9358690558550066 0.528385
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(13)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 2.95766 5.98871 0.0753552
+  rotation 0.6546520822213608 0.6546560822218632 0.37796304747046094 -2.4188553071795864
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(7)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 3.07766 5.39117 0.420355
+  rotation 0.6947440600307527 0.6947490600311846 -0.18615701608527 2.77349
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(8)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation -7.87358 -0.848114 0.13995
+  rotation -0.4090659459263943 -0.23617396878063748 0.8814118834879336 1.15981
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(3)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 7.39153 -8.87663 -0.114608
+  rotation 0.10225401708966418 -0.7767001298095152 0.6215151038735173 2.25159
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(4)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 4.83153 -13.3133 -0.114608
+  rotation 0.205797917288639 0.9783916067788128 -0.019926891991268042 -2.3235953071795863
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(10)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 12.0265 -5.20122 -0.18005
+  rotation -0.7745965212991105 -0.44721372362178063 0.44721372362178063 1.82348
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(5)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 19.2792 -4.81686 -0.18005
+  rotation 0.8320494726762069 0.4803852729004658 0.2773511575594931 2.24593
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S3.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(12)"
+  boundingObject USE ROCK1
+}
+Solid {
+  translation 10.7657 3.77557 0.26552
+  rotation 0.9653654933931202 -0.2586691322044045 -0.03405501740533654 2.88876
+  children [
+    Shape {
+      appearance DryMud {
+      }
+      geometry DEF ROCK1 Mesh {
+        url [
+          "../../../rock mesh/processed/rock2-4S.stl"
+        ]
+      }
+    }
+  ]
+  name "Rock3-1(16)"
+  boundingObject USE ROCK1
+}
+DEF ROBOT Robot {
+  translation 4.01428 1.02706 -0.19404
+  rotation 0 0 1 -1.5660653071795858
+  children [
+    Gyro {
+    }
+    Compass {
+    }
+    GPS {
+    }
+    Pose {
+      translation 0 0 0.1245
+      rotation 0 0 1 -1.570796
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.74902 0.74902 0.74902
+            roughness 1
+            metalness 0
+          }
+          geometry DEF BODY Cylinder {
+            height 0.24
+            radius 0.135
+          }
+        }
+      ]
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        position 109.1326572165503
+        axis 0 1 0
+        anchor 0 0 0.075
+      }
+      device [
+        RotationalMotor {
+          name "left wheel motor"
+          consumptionFactor 70
+          maxVelocity 100
+        }
+        PositionSensor {
+          name "left wheel sensor"
+        }
+      ]
+      endPoint Solid {
+        translation 0 0.13499999999997944 0.075
+        rotation 0.6492952158314749 -0.6492953991282647 0.3960192007582788 3.8957326918827726
+        children [
+          DEF WHEEL Pose {
+            rotation 0.577656895078166 0.5771968951617173 -0.5771968951617173 -2.093935
+            children [
+              Shape {
+                appearance PBRAppearance {
+                  baseColor 0.301961 0.301961 0.301961
+                  roughness 1
+                  metalness 0
+                }
+                geometry Cylinder {
+                  height 0.0005
+                  radius 0.0715
+                  subdivision 50
+                }
+              }
+            ]
+          }
+        ]
+        name "left wheel"
+        contactMaterial "roboWheel"
+        boundingObject USE WHEEL
+        physics DEF PHYSICS_WHEEL Physics {
+          density -1
+          mass 0.05
+        }
+      }
+    }
+    HingeJoint {
+      jointParameters HingeJointParameters {
+        position 97.96504738935066
+        axis 0 1 0
+        anchor 0 0 0.075
+      }
+      device [
+        RotationalMotor {
+          name "right wheel motor"
+          consumptionFactor 70
+          maxVelocity 100
+        }
+        PositionSensor {
+          name "right wheel sensor"
+        }
+      ]
+      endPoint Solid {
+        translation 0 -0.13499999999999668 0.075
+        rotation 0.684619863684993 -0.6846198015442219 -0.2501826724245547 2.651291522769957
+        children [
+          USE WHEEL
+        ]
+        name "right wheel"
+        contactMaterial "roboWheel"
+        boundingObject USE WHEEL
+        physics USE PHYSICS_WHEEL
+      }
+    }
+    DEF US0 DistanceSensor {
+      translation 0.115 0.07 0.189
+      rotation 0 0 -1 -0.499205
+      children [
+        DEF SONAR_SENSOR Pose {
+          rotation 0.577656895078166 0.5771968951617173 -0.5771968951617173 -2.093935
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 0.301961 0.301961 0.301961
+                roughness 1
+                metalness 0
+              }
+              geometry Cylinder {
+                height 0.01
+                radius 0.024
+              }
+            }
+          ]
+        }
+      ]
+      name "us0"
+      lookupTable [
+        0 0.7 0.01
+        2 0 0
+      ]
+      type "sonar"
+      numberOfRays 20
+    }
+    DEF US1 DistanceSensor {
+      translation 0.115 -0.07 0.189
+      rotation 0 0 1 -0.500795
+      children [
+        USE SONAR_SENSOR
+      ]
+      name "us1"
+      lookupTable [
+        0 0.7 0.1
+        2 0 0
+      ]
+      type "sonar"
+      numberOfRays 20
+    }
+    DEF LIDAR Lidar {
+      translation 0 0 0.45
+      children [
+        Transform {
+          translation 0 0 -0.01
+          rotation 0 0 -1 1.570796
+          scale 6 5 3
+          children [
+            DEF STRUCTURE_AXES Shape {
+              appearance Appearance {
+                material Material {
+                  diffuseColor 0.02 0.02 0.02
+                }
+              }
+              geometry IndexedLineSet {
+                coord Coordinate {
+                  point [
+                    0 0 0.01
+                    0.01 0 -0.08
+                    -0.01 0 -0.08
+                    0 0.01 -0.08
+                    0 -0.01 -0.08
+                  ]
+                }
+                coordIndex [
+                  0, 1, 0, 2, 0, 3, 0, 4
+                ]
+              }
+            }
+          ]
+        }
+      ]
+      rotationStep 0.261799
+      horizontalResolution 320
+      fieldOfView 3.2
+      numberOfLayers 1
+      near 0.05
+      minRange 0.05
+      maxRange 8
+      defaultFrequency 2
+      rotatingHead Solid {
+        children [
+          Pose {
+            translation 0.03 0 0
+            rotation 0 0 1 3.14159
+            children [
+              DEF LENS Shape {
+                appearance PBRAppearance {
+                  baseColor 0 0 0
+                  roughness 1.1102230246251565e-16
+                  metalness 0
+                }
+                geometry Sphere {
+                  radius 0.015
+                  subdivision 2
+                }
+              }
+            ]
+          }
+          DEF CAMERA_SHAPE Pose {
+            rotation -0.5771978956908259 0.5776548956082386 0.5771978956908259 -2.093935
+            children [
+              DEF CAMERA_OUTLINE Shape {
+                appearance PBRAppearance {
+                  baseColor 0.898039 0.898039 0.898039
+                  roughness 1
+                  metalness 0
+                }
+                geometry Cylinder {
+                  height 0.06
+                  radius 0.024
+                }
+              }
+            ]
+          }
+        ]
+        rotationStep 0.261799
+      }
+    }
+  ]
+  name "MyBot"
+  contactMaterial "robo_body"
+  boundingObject Pose {
+    translation 0 0 0.1245
+    rotation 0 0 1 -1.570796
+    children [
+      USE BODY
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 1.5
+    centerOfMass [
+      0 0 0.15
+    ]
+  }
+  controller "webots_controller"
+  supervisor TRUE
+}

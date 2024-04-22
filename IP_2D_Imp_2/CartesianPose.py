@@ -75,6 +75,9 @@ class CartesianPose:
         
         return this
     
+    def asNumpy(this):
+        return np.array((this.x, this.y, this.yaw))
+    
     def subtractPose(this, inputPose ):
         """Subtracts input pose to this pose, doesn't perform any rotations just add's values"""
         this.x -= inputPose.x

@@ -102,16 +102,16 @@ class ProbabilityGrid:
             scanTerminations.append( [ xPoints, yPoints ] )
             scanNoHits.append( isInf )
             
-            xMax = max( targScan.pose.x - zeroPose.x, xMax, np.max( xPoints ) )
-            xMin = min( targScan.pose.x - zeroPose.x, xMin, np.min( xPoints ) )
-            yMax = max( targScan.pose.y - zeroPose.y, yMax, np.max( yPoints ) )
-            yMin = min( targScan.pose.y - zeroPose.y, yMin, np.min( yPoints ) )
+            xMax = max( targScan.pose.x - zeroPose.x, xMax, np.max( xPoints ) ) + 0.05
+            xMin = min( targScan.pose.x - zeroPose.x, xMin, np.min( xPoints ) ) - 0.05
+            yMax = max( targScan.pose.y - zeroPose.y, yMax, np.max( yPoints ) ) + 0.05
+            yMin = min( targScan.pose.y - zeroPose.y, yMin, np.min( yPoints ) ) - 0.05
         
         
-        finalGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
+        finalGrid = ProbabilityGrid( xMin , xMax , yMin , yMax , cellRes )
          
         for targScan, terminations, noHits in zip(scanStack, scanTerminations, scanNoHits): 
-            nProbGrid = ProbabilityGrid( xMin-0.01, xMax+0.01, yMin-0.01, yMax+0.01, cellRes )
+            nProbGrid = ProbabilityGrid( xMin , xMax , yMin , yMax , cellRes )
             nProbGrid.addPolyLines( targScan.pose.x - zeroPose.x, targScan.pose.y - zeroPose.y, 
                                terminations[0], terminations[1], noHits  )
             
@@ -126,6 +126,8 @@ class ProbabilityGrid:
             else:
                 finalGrid.negativeData += nProbGrid.negativeData
                 finalGrid.positiveData += nProbGrid.positiveData
+        
+        #absGrid = np.abs(finalGrid.negativeData) + np.abs(finalGrid.positiveData) + 0.00000000000001
         
         finalGrid.negativeData /= len(scanStack)
         finalGrid.positiveData /= len(scanStack) 
@@ -188,7 +190,7 @@ class ProbabilityGrid:
         cellRes = gridStack[0].cellRes
         nGrid = ProbabilityGrid( xMin, xMax, yMin, yMax, cellRes )
         nGrid.mapEstimate = np.zeros( nGrid.negativeData.shape )
-        absEst = np.zeros( nGrid.negativeData.shape )
+        absEst = np.ones( nGrid.negativeData.shape )*0.00000000001
 
         for targGrid in gridStack:
             gridXCorn = int((targGrid.xMin - nGrid.xMin)*cellRes)
@@ -333,14 +335,14 @@ class ProbabilityGrid:
         if ( this.asKeypoints != None ):
             return
         
-        descRad = 12
+        descRad = 10
         extSize = descRad*2+1
 
-        lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 2.8, 0.02 )  )
+        lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 3.5, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 32 )
-        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 30 ) 
+        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24 )
+        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24 ) 
 
         # plt.figure( 415 )
         # plt.clf()
@@ -355,11 +357,38 @@ class ProbabilityGrid:
         ""
 
         this.featureDescriptors = descriptors.astype(np.float32)
-        this.asKeypoints = []
-
-        intrestPoints = intrestPoints# + np.array(( this.xAMin, this.yAMin ))
+        this.asKeypoints = [] 
 
         for desc, pos, angle in zip( this.featureDescriptors, intrestPoints, angleAlignment ):
             this.asKeypoints.append( KeyPoint( float(pos[0]), float(pos[1]), extSize, angle=float(angle) ) )
         "" 
-    
+        
+        # Feature extraction on a higher level 
+        if ( True ):
+            descRad = 18
+            extSize = descRad*2+1
+            
+            lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 4, 0.02 )  )
+            intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 9 )
+
+            #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24 )
+            descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24 ) 
+
+            # plt.figure( 415 )
+            # plt.clf()
+            # plt.imshow( this.mapEstimate, origin="lower" )
+            # plt.plot(  intrestPoints[:,0], intrestPoints[:,1], "rx" )
+            # plt.show( block=False )
+
+            # for desc in descriptors:
+            #     plt.figure( 4155 )
+            #     plt.plot(  desc  )
+            #     plt.show( block=False ) 
+            ""
+
+            this.featureDescriptors = np.concatenate((this.featureDescriptors, descriptors.astype(np.float32)), axis=0)    
+
+            for desc, pos, angle in zip( this.featureDescriptors, intrestPoints, angleAlignment ):
+                this.asKeypoints.append( KeyPoint( float(pos[0]), float(pos[1]), extSize, angle=float(angle) ) )
+            ""
+                

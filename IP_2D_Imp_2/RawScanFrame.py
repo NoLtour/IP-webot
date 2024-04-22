@@ -17,6 +17,9 @@ class RawScanFrame:
     
     index:int = None
 
+    def copy(this):
+        return RawScanFrame( scanDistances=this.scanDistances, scanAngles=this.scanAngles, pose=this.pose.copy(), truePose=this.truePose, index=this.index )
+    
     @staticmethod
     def exportScanFrames( scanStack: list[RawScanFrame], fileName:str ):  
         rawExport = jsonpickle.encode( scanStack )

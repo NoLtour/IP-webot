@@ -195,7 +195,9 @@ class LabelledGridGraphDisplay( PlotDisplay ):
     def __init__(this, xPosition, yPosition, width, height, parentWindow,  xLabel="", yLabel="", title=""): 
         super().__init__( xPosition, yPosition, width, height, parentWindow )  
          
-        this.gData = np.random.random( (100, 100) )*1.2-0.2
+        this.gData = np.zeros( (100, 100) )
+        this.gData[0,0] = 1
+        this.gData[0,1] = -1
         this.lData = [[0, 10, 20], [0, 10, 5]]
          
         this.gridGraph = this.subAxis.imshow(this.gData, interpolation='none', origin='lower' )

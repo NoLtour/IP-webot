@@ -52,10 +52,29 @@ class RobotController:
         
         this.navigator = Navigator( this.wheel_diameter, this.wheel_seperation )
         #this.mapper = Mapper( this.navigator )
+        
         this.navigator.addTarget(2, 0)
         this.navigator.addTarget(2, -2)
         this.navigator.addTarget(0, -2)
         this.navigator.addTarget(0, 0)
+        this.navigator.addTarget(2, 0)
+        
+        # this.navigator.addTarget(4, 0)
+        # this.navigator.addTarget(5, -3)
+        # this.navigator.addTarget(3, -6)
+        # this.navigator.addTarget(2, -8)
+        # this.navigator.addTarget(0, -8)
+        # this.navigator.addTarget(0, -3)
+        # this.navigator.addTarget(-2, -2)
+        # this.navigator.addTarget(-2, 3)
+        # this.navigator.addTarget(0, 5)
+        # this.navigator.addTarget(3, 5)
+        # this.navigator.addTarget(5, 3)
+        # this.navigator.addTarget(3, 1)
+        # this.navigator.addTarget(0, 0)
+        # this.navigator.addTarget(-2, 0)
+        # this.navigator.addTarget(-2, -2)
+        
         
         this.navigatorWithError = Navigator( this.wheel_diameter, this.wheel_seperation )
         
@@ -96,7 +115,7 @@ class RobotController:
         this.setWheelVelocity( lVel, rVel )
         
         if (not this.navigator.hasTarget()):
-            RawScanFrame.exportScanFrames( this.allRawScans, "cleanDataWideNew4" )
+            RawScanFrame.exportScanFrames( this.allRawScans, "TEST1_LinearMatchedData-3" )
         
         return
         lpRoboDisplay.parseData( this.navigator.currentPose, this.realPose, [[0],[0]] ) 

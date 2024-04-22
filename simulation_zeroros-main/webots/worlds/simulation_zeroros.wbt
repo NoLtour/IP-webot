@@ -30,7 +30,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.005398042650515628 0.9999705508825947 0.005455135479832842 1.5608286177774473
-  position 0.8022928673684918 1.321728502705357 11.016267653440188
+  position 0.7224725564060078 1.3208438986974196 19.000780383889378
   follow "MyBot"
 }
 TexturedBackground {
@@ -104,7 +104,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -4.01 -1.5 0.4
+  translation -4.01 0 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -134,7 +134,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -4.01 0.5 0.4
+  translation -4.01 2 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -307,7 +307,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999997994 0.075
+        translation 0 0.13499999999997972 0.075
         rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
@@ -442,7 +442,7 @@ DEF ROBOT Robot {
       ]
       rotationStep 0.261799
       horizontalResolution 320
-      fieldOfView 3.12
+      fieldOfView 3.2
       numberOfLayers 1
       near 0.05
       minRange 0.05

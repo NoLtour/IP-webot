@@ -18,6 +18,9 @@ from skimage.measure import ransac
 
 from IPConfig import IPConfig
 
+from GraphLib import GraphSLAM2D
+from CartesianPose import CartesianPose
+
 import cv2
 
 class Chunk:
@@ -34,7 +37,8 @@ class Chunk:
     config: IPConfig = IPConfig() # Can be changed
 
     """ RELATIONAL PROPERTIES - AS A CHILD """
-    offsetFromParent: np.ndarray = None
+    graphVertexID: int = None
+    #offsetFromParent: np.ndarray = None
     parent: Chunk = None
     isCentre: bool = False
     """ This is given in the parent's coordinate frame! With the parent existing at 0,0 with the x axis aligned to its rotation! """
@@ -43,6 +47,8 @@ class Chunk:
     
     """ CACHED MAPPED DATA """
     cachedProbabilityGrid: ProbabilityGrid = None 
+    
+    graphSLAM:GraphSLAM2D = None
 
     """ SECTION - constructors (static) """
     @staticmethod
@@ -69,8 +75,50 @@ class Chunk:
 
         this.isScanWrapper = False 
         this.subChunks = []
+        
+        this.graphSLAM = GraphSLAM2D()
 
         return this 
+    
+    def exportAsRaws( this ) -> list[RawScanFrame]:
+        """ This exports the current chunk stack as raws using the new position data """
+        
+        asRaws = []
+        
+        rawSubChunks, rawPositions = this.extractAllChildRaws()
+        
+        for rawSubChunk, rawPosition in zip(rawSubChunks, rawPositions):
+            
+            centreRaw = rawSubChunk.rawScans[rawSubChunk.centreScanIndex]
+            
+            newRaw = centreRaw.copy()
+            newRaw.pose = CartesianPose( rawPosition[0], rawPosition[1], 0, 0, 0, rawPosition[2] )
+            
+            asRaws.append( newRaw )
+        
+        return asRaws
+    
+    def exportAsChunks( this, chunkSize:int, config:IPConfig  ):
+        return Chunk.initFromProcessedScanStack( this.exportAsRaws(), chunkSize, config )
+    
+    @staticmethod 
+    def initFromProcessedScanStack(  inpRaws:list[RawScanFrame], chunkSize, config:IPConfig  ): 
+        rawStack = []
+        
+        asChunks = []
+        
+        for i in range(0, len(inpRaws)):
+            rawStack.append( Chunk.initFromRawScans( [inpRaws[i]], config ) )
+            
+            if ( len(rawStack) > chunkSize or i==len(inpRaws)-1 ):
+                nChunk = Chunk.initEmpty( config )
+                nChunk.addChunks( rawStack )
+                
+                asChunks.append( nChunk )
+                
+                rawStack = []
+    
+        return asChunks
     
     """ SECTION - mergers? """ 
     def addChunks( this, subChunks:list[Chunk] ):
@@ -96,14 +144,31 @@ class Chunk:
                 this.centreChunkIndex = int(len(this.subChunks)/2)
             else:
                 this.centreChunkIndex = forcedValue
-                
-            this.subChunks[ this.centreChunkIndex ].isCentre = True
             
-            for otherChunk in this.subChunks:
-                X, Y, yaw = otherChunk.determineInitialOffset()
+            centreChunk = this.subChunks[ this.centreChunkIndex ]
+            
+            centreChunk.isCentre = True
+            centreChunk.graphVertexID = this.graphSLAM.add_fixed_pose()
+            
+            prevChunkIs = [ i for i in range( this.centreChunkIndex, len(this.subChunks)-1 ) ]
+            prevChunkIs.extend( [ this.centreChunkIndex-i for i in range( 0, this.centreChunkIndex ) ] )
+            
+            nextChunkIs = [ i+1 for i in range( this.centreChunkIndex, len(this.subChunks)-1 ) ]
+            nextChunkIs.extend( [ this.centreChunkIndex-(i+1) for i in range( 0, this.centreChunkIndex ) ] )
+             
+            for i in range(0, len(this.subChunks)-1):
+                prevChunk = this.subChunks[prevChunkIs[i]]
+                nextChunk = this.subChunks[nextChunkIs[i]]
                  
-                otherChunk.offsetFromParent = np.array(( X, Y, yaw ))
-    
+                X, Y, yaw = prevChunk.determineInitialOffset( nextChunk )
+                
+                #prevChunk.offsetFromParent = np.array(( X, Y, yaw )) 
+                nextChunk.graphVertexID = this.graphSLAM.add_pose( prevChunk.graphVertexID, np.array((X, Y, yaw)), 0.1 ) 
+
+            this.graphSLAM.optimize() 
+            
+            ""
+            
     """ SECTION - data integrity managers """
     def clearCache( this ):
         """ Run when there are changes to this parents children which mean cached values are no longer valid
@@ -134,7 +199,19 @@ class Chunk:
         
         this.clearCache()
         
+    """ SECTION - graphslam integration """
     
+    def updateOffset( this, targetChunk:Chunk, newOffset:np.ndarray ):
+        """ updates this chunks offset from some refrance, adding it as a new constraint in the graph """
+
+        if ( this.isCentre ):
+            this.parent.graphSLAM.relate_pose(  targetChunk.graphVertexID, this.graphVertexID, -newOffset, 1 )
+        else:
+            this.parent.graphSLAM.relate_pose(  this.graphVertexID, targetChunk.graphVertexID, newOffset, 1 )
+        
+        this.parent.graphSLAM.optimize()
+        this.parent.clearCache()
+        
     """ SECTION - chunk navigators, for getting objects such as children or parents related to this chunk """
 
     def getCommonParent( this, otherChunk:Chunk ):
@@ -157,15 +234,7 @@ class Chunk:
         # TODO make this return the estimated pose AFTER finding offsets of this node from whatever is defined as the origin
         
         raise RuntimeError("Not implemented")
-    
-    def updateOffset( this, newOffset:np.ndarray ):
-        """ updates this chunks offset from parent, setting it to the new value """
-
-        if ( this.isCentre ):
-            raise RuntimeError("Cannot update the offset of the centre chunk!")
-        
-        this.offsetFromParent = newOffset
-        this.parent.clearCache()
+     
 
     def getNormalOffsetFromLocal( this, localOffset:np.ndarray ):
         """ returns the offset in the parents refrance frame, after being provided a vector in this chunks refrence frame """
@@ -209,69 +278,125 @@ class Chunk:
         # Here it's converted into this chunks local refrance frame
         return this.getLocalOffsetFromNormal( offsetVector )
     
+    def getTRUEOffsetLocal( this, otherChunk:Chunk ):
+        if ( this.parent != otherChunk.parent ):
+            raise RuntimeError("Chunks don't share parent")
+        
+        thisPosition  = this.getRawCentre().truePose 
+        thisPosition = np.array( (thisPosition.x, thisPosition.y, thisPosition.yaw) )
+        otherPosition = otherChunk.getRawCentre().truePose 
+        otherPosition = np.array( (otherPosition.x, otherPosition.y, otherPosition.yaw) )
+        
+        # This offsets in parents refrance frame
+        offsetVector = otherPosition - thisPosition 
+        
+        sepLength = np.sqrt( offsetVector[0]**2 + offsetVector[1]**2 )
+        beta = np.arctan2( offsetVector[1], offsetVector[0] )
+        
+        newBeta = beta - thisPosition[2]
+        
+        localOffset = np.array((sepLength*np.cos( newBeta ), sepLength*np.sin( newBeta ), offsetVector[2] ))
+        
+        # Here it's converted into this chunks local refrance frame
+        return localOffset
+        
+    
     def getOffset( this  ):
         """ returns this chunks offset from it's parent, if chunk has no parent it's simply zero """
         
         if ( this.parent == None ):
             return np.zeros(3)
         
+        return this.parent.graphSLAM.vertex_pose( this.graphVertexID )
         return this.offsetFromParent.copy()
 
-    def extractAllChildRawLimitIndecies( this, minIndex = 99999999999999, maxIndex = -999999999999999, minScan=None, maxScan=None ):
-        """ returns the maximum and minimum raw indicies assosiated with this scan stack """
+    def extractAllChildRaws( this ):
+        """ returns all raw scan chunks, and their position in this chunks refrance frame. Done recursively """
+        
+        allRaws    = []
+        allOffsets = []
         
         if ( this.isScanWrapper ):
-            centScan = this.rawScans[ this.centreScanIndex ]
+            return [this], [this.getOffset()]
+        
+        for subChunk in this.subChunks: 
+            rawChunks, offsets = subChunk.extractAllChildRaws()
             
-            if ( minIndex > centScan.index ):
-                minIndex = centScan.index
-                minScan = centScan
-            if ( maxIndex < centScan.index ):
-                maxIndex = centScan.index
-                maxScan = centScan
-             
-            return minIndex, maxIndex, minScan, maxScan
-        
-        for subChunk in this.subChunks:
-            minIndex, maxIndex, minScan, maxScan = subChunk.extractAllChildRawLimitIndecies(minIndex, maxIndex, minScan, maxScan)
-            
-        return minIndex, maxIndex, minScan, maxScan
+            for offset in offsets:
+                allOffsets.append( this.getNormalOffsetFromLocal( offset ) )
+            allRaws.extend( rawChunks )
+                
+        return allRaws, allOffsets
     
-    def findNearestRawScans( this, otherRoot:Chunk ):
-        thisMaxIndx, thisMinIndx, thisMinScan, thisMaxScan = this.extractAllChildRawLimitIndecies()
-        otherMaxIndx, otherMinIndx, otherMinScan, otherMaxScan = otherRoot.extractAllChildRawLimitIndecies()
+    def findResonableRelation( this, otherRoot:Chunk ):
+        """ Attempts to find over """
         
-        thisClosestScan, otherClosestScan = thisMinScan, otherMaxScan if abs(otherMaxIndx - thisMinIndx)<abs(thisMaxIndx - otherMinIndx) else thisMaxScan, otherMinScan
+        thisRaws = this.extractAllChildRaws()
+        otherRaws = otherRoot.extractAllChildRaws()
         
-        ""
+        minSep = 99999999999999999
+        indx1 = -1
+        indx2 = -1
         
+        for thisRaw in thisRaws:
+            for otherRaw in otherRaws:
+                nIndx1 = thisRaw.getRawCentre().index
+                nIndx2 = otherRaw.getRawCentre().index
+                sep = abs(nIndx1 - nIndx2)
+                if ( sep < minSep ):
+                    minSep = sep
+                    indx1 = nIndx1
+                    indx2 = nIndx2
         
+        if ( minSep != 1 ):
+            raise RuntimeError("Hey we didn't account for this")
+        
+        fromCommonToThis = thisRaws[indx1].getLocalOffsetFromNormal( this )
+        fromCommonToOther = otherRaws[indx2].getLocalOffsetFromNormal( otherRoot )
+        
+        # NOT ACCOUNTING FOR THE CHANGE BETWEEN "COMMON" FRAMES!
+        
+        # In this local refrance frame
+        vectorToOther = fromCommonToOther - fromCommonToThis
+        
+        return vectorToOther
+        
+    def getGrandParentVector( this, grandParent:Chunk ):
+        """ Returns the vector (in this chunks refrance frame) from this chunk to the set grandparent """
+        if ( grandParent == this ):
+            return np.zeros(3)
+        if ( this.parent == None ):
+            raise RuntimeError("what")
+        
+        return this.getLocalOffsetFromNormal( this.parent.getGrandParentVector( grandParent ) + this.getOffset() )
     
-    def determineInitialOffset( this ):
-        """ This makes the initial estimation of this chunks offset from it's parent, returning a pose representing the offset
-          the returned pose is interms of the parent's orientation (forward, upward, alignedYaw)
+    def determineInitialOffset( this, comparisonTarget:Chunk ):
+        """ This makes the initial estimation of this chunks offset from a target, returning a pose representing the offset
+          the returned pose is interms of this nodes orientation
               """
-        
-        # TODO current implementation only makes use of first raw position data
-        parentCentre = this.parent.getRawCentre().pose
+         
         thisCentre = this.getRawCentre().pose
+        targetCentre = comparisonTarget.getRawCentre().pose
+         
         
-        #this.findNearestRawScans(  )
-        
-        X = thisCentre.x - parentCentre.x
-        Y = thisCentre.y - parentCentre.y
-        alpha = thisCentre.yaw - parentCentre.yaw
+        X = thisCentre.x - targetCentre.x
+        Y = thisCentre.y - targetCentre.y
+        alpha = thisCentre.yaw - targetCentre.yaw
 
         seperation = np.sqrt( X**2 + Y**2 )
-        vecAngle   = np.arctan2( Y, X )- parentCentre.yaw 
+        vecAngle   = np.arctan2( Y, X )- targetCentre.yaw 
 
-        return np.array((seperation*np.cos( vecAngle ), seperation*np.sin( vecAngle ), alpha))
+        return -np.array((seperation*np.cos( vecAngle ), seperation*np.sin( vecAngle ), alpha))
 
     def getRawCentre( this ):
         """ This recursively follows the centres of the chunk until the lowest raw middle scan is found """
         if ( this.isScanWrapper ):
             return this.rawScans[ this.centreScanIndex ]
         else:
+            #raw0to1 = this.subChunks[ this.centreChunkIndex ].getRawCentre().pose.asNumpy() - this.subChunks[ 0 ].getRawCentre().pose.asNumpy()
+            #raw1to2 = this.subChunks[ -1 ].getRawCentre().pose.asNumpy() - this.subChunks[ this.centreChunkIndex ].getRawCentre().pose.asNumpy()
+            
+            
             return this.subChunks[ this.centreChunkIndex ].getRawCentre()
 
     def getRawFrameData( this ):
@@ -328,6 +453,7 @@ class Chunk:
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
+        thisWindow, transWindow = thisWindow**3, transWindow**3
         
         # First the search region is defined  
         intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
@@ -335,7 +461,8 @@ class Chunk:
         x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
         
         errorWindow = -np.minimum(thisWindow*transWindow, 0)
-        errorWindow = -(thisWindow*transWindow)  
+        #errorWindow = -np.abs(thisWindow*transWindow)  
+        errorWindow = (thisWindow-transWindow)*np.abs(thisWindow*transWindow)  
 
         conflictWindow = (thisWindow*transWindow) 
         conflictWindow = -np.minimum( conflictWindow, 0 )  
@@ -343,17 +470,17 @@ class Chunk:
         erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
         erDy = convolve2d( errorWindow, y1DGuas, mode="same" ) 
         
-        lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0))/this.config.OBJECT_PIX_DIAM
+        lengthScale = np.sum(intrestMask*((thisWindow>0) + (transWindow>0))) 
         if ( lengthScale==0 ): return 0,0,0 
         
-        erDx = conflictWindow*np.where(thisWindow<0,erDx,-erDx)/lengthScale 
-        erDy = conflictWindow*np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+        erDx = conflictWindow*np.where(thisWindow<0,erDx,erDx)/lengthScale 
+        erDy = conflictWindow*np.where(thisWindow<0,erDy,erDy)/lengthScale  
          
         erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
         erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
           
-        erDyMask = (np.abs(erDy)>0)
-        erDxMask = (np.abs(erDx)>0)
+        erDyMask = (np.abs(erDy)>np.max(np.abs(erDy))*0.001)
+        erDxMask = (np.abs(erDx)>np.max(np.abs(erDx))*0.001)
         
         xError = np.sum(erDx)
         yError = np.sum(erDy)
@@ -745,7 +872,7 @@ class Chunk:
         
         return foundDirectionErrors, errorScore, 1
 
-    def determineErrorFeaturelessDirect( this, otherChunk:Chunk, iterations:int, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+    def determineErrorFeaturelessDirect( this, otherChunk:Chunk, iterations:int, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False, scoreRequired=99999999, maxImpScore=0 ):
         """ This finds the relative offset between two chunks without using features, using the custom method """
         
         errorScores = []
@@ -754,11 +881,15 @@ class Chunk:
         offsetValues.append( forcedOffset.copy() )
         errorScores.append( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
         
+        if ( errorScores[0] < maxImpScore ):
+            print("godd enough: ", errorScores[0])
+            return np.nan, np.nan
+         
         for i in range(0, iterations):  
-            if ( errorScores[-1] < this.config.ITERATIVE_REDUCTION_PERMITTED_ERROR or ( i>3 and errorScores[-1]>errorScores[-4] ) ):
+            if ( errorScores[-1] < this.config.ITERATIVE_REDUCTION_PERMITTED_ERROR or ( i>3 and errorScores[-1]>errorScores[-3]*1.1 ) ):
                 break # breaks early if the error is below some permitted threshold
             
-            predictedErrors = np.array(this.determineErrorFeatureless3( otherChunk, forcedOffset ))
+            predictedErrors = np.array(this.determineErrorFeatureless3( otherChunk, forcedOffset, False ))
             
             forcedOffset -= predictedErrors*this.config.ITERATIVE_REDUCTION_MULTIPLIER
             
@@ -770,39 +901,53 @@ class Chunk:
         offsetAdjustment = offsetValues[ lowestErrorIndex ]
         newErrorScore    = errorScores[ lowestErrorIndex ]
         
-        if ( updateOffset ):
-            # this is found in parent refrance frame
-            toTargetVector = this.getNormalOffsetFromLocal( this.getLocalOffsetFromTarget( otherChunk ) + offsetAdjustment )
+        if ( newErrorScore > scoreRequired ):
+            print("rejected", newErrorScore)
+            return np.nan, np.nan
+        
+        if ( updateOffset ): 
+            toTargetVector = ( this.getLocalOffsetFromTarget( otherChunk ) + offsetAdjustment )
             
-            targetNewPosition = toTargetVector + this.getOffset()
+            #this.plotDifference( otherChunk, offsetAdjustment )
             
-            otherChunk.updateOffset( targetNewPosition )
+            #targetNewPosition = toTargetVector + this.getOffset()
+            #this.plotDifference( otherChunk, this.getLocalOffsetFromTarget( otherChunk ), True )
+            #this.plotDifference( otherChunk, toTargetVector, True )
             
+            this.updateOffset( otherChunk, toTargetVector )
+        
+        print( "did it:",newErrorScore )
         return offsetAdjustment, newErrorScore
     
-    def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False ):
+    def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False, scoreRequired=99999999, returnOnPoorScore=False, maxImpScore=0 ):
         """ This finds the relative offset between two chunks using features  """
           
         initErrorScore = ( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
+        
+        if ( initErrorScore < maxImpScore ):
+            print("godd enough: ", initErrorScore)
+            return np.nan, np.nan
         
         newOffset, wasSuccess = this.determineErrorKeypoints( otherChunk, forcedOffset )
         if ( not wasSuccess ):
             return np.nan, np.nan
         
         newErrorScore, overlapRegion  = this.determineDirectDifference( otherChunk, newOffset, True )
+        adjustmentOffset = newOffset - this.getLocalOffsetFromTarget( otherChunk )
         
-        if ( newErrorScore > initErrorScore or overlapRegion<10 ):
+        if ( newErrorScore > initErrorScore or overlapRegion<10 or newErrorScore > scoreRequired ):
+            if ( returnOnPoorScore ): 
+                return adjustmentOffset, newErrorScore
             return np.nan, np.nan
+         
         
         if ( updateOffset ):
-            # this is found in parent refrance frame
-            toTargetVector = this.getNormalOffsetFromLocal( this.getLocalOffsetFromTarget( otherChunk ) + newOffset )
+            # this is found in parent refrance frame 
+            #targetNewPosition = toTargetVector + this.getOffset()
             
-            targetNewPosition = toTargetVector + this.getOffset()
-            
-            otherChunk.updateOffset( targetNewPosition )
-            
-        return newOffset, newErrorScore
+            this.updateOffset( otherChunk, newOffset )
+        
+        return adjustmentOffset, newErrorScore
     
     def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
         """ determines the error between two images without using features """
@@ -827,7 +972,7 @@ class Chunk:
 
         errorWindow = -np.minimum( errorWindow, 0 ) 
         
-        if ( mArea == 0 ):
+        if ( mArea == 0 or mArea<20 ):
             return 1000000000, 0
 
         errorScore = 1000*np.sum(errorWindow)/mArea
@@ -879,6 +1024,9 @@ class Chunk:
         cXMax = min( thisProbGrid.xAMax, nTransProbGrid.xAMax ) - 1
         cYMin = max( thisProbGrid.yAMin, nTransProbGrid.yAMin ) + 1
         cYMax = min( thisProbGrid.yAMax, nTransProbGrid.yAMax ) - 1
+        
+        if ( cXMin >= cXMax or cYMin >= cYMax ):
+            return np.zeros(4).reshape((2,2)), np.zeros(4).reshape((2,2))
 
         cWidth  = cXMax-cXMin
         cHeight = cYMax-cYMin
@@ -962,7 +1110,10 @@ class Chunk:
         index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
         search_params = dict(checks=150)  # or pass empty dictionary
          
-        kVal = 5
+        kVal = 5 if this.config.FEATURE_COMPARISON_FILTER_DISTANCE else 2
+        
+        if ( thisDescriptors.size<5 or otherDescriptors.size<5 ): 
+            return False, False
         
         bf = cv2.BFMatcher() 
         matches = bf.knnMatch(thisDescriptors, otherDescriptors, k=kVal)  
@@ -977,21 +1128,31 @@ class Chunk:
         
         offSetScale = 0
         
-        for matchSet in matches:
-            prevScore = 99999999999999
-            for match in matchSet:
-                if (  match.distance*0.85 > prevScore or match.distance>10 ):#
-                    break
-                prevScore = match.distance
-                
-                srcKeypoint = thisKeypoints[match.queryIdx]
-                dstKeypoint = otherKeypoints[match.trainIdx]
-                
-                src_I.append( match.queryIdx )
-                src_pts.append( srcKeypoint.pt )
-                dst_pts.append( dstKeypoint.pt )
-                flatMatches.append( match )
-                
+        for matchSet in matches: 
+            if ( this.config.FEATURE_COMPARISON_FILTER_DISTANCE ):
+                for match in matchSet:
+                    if (  match.distance*0.92 > matchSet[0].distance or match.distance>5 ):#
+                        break 
+                    
+                    srcKeypoint = thisKeypoints[match.queryIdx]
+                    dstKeypoint = otherKeypoints[match.trainIdx]
+                    
+                    src_I.append( match.queryIdx )
+                    src_pts.append( srcKeypoint.pt )
+                    dst_pts.append( dstKeypoint.pt )
+                    flatMatches.append( match )
+            else:
+                if (  matchSet[1].distance*0.8 > matchSet[0].distance ):#  
+                    srcKeypoint = thisKeypoints[matchSet[0].queryIdx]
+                    dstKeypoint = otherKeypoints[matchSet[0].trainIdx]
+                    
+                    src_I.append( matchSet[0].queryIdx )
+                    src_pts.append( srcKeypoint.pt )
+                    dst_pts.append( dstKeypoint.pt )
+                    flatMatches.append( matchSet[0] )
+        
+            
+        
         src_pts = np.float32(src_pts).reshape(-1, 2)
         dst_pts = np.float32(dst_pts).reshape(-1, 2) 
         
@@ -1037,7 +1198,18 @@ class Chunk:
             (src_pts_filt, dst_pts_filt), EuclideanTransform, min_samples=2, residual_threshold=2, max_trials=100
         )
         
-        if ( (inliers is None) or np.sum(inliers) < 4 ):
+        if ( showPlot ):
+            # Draw filtered matches
+            matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flatMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
+            # Display the matched image
+            cv2.imshow('Matches flat', matched_image)
+            
+            # Draw filtered matches
+            matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flat_match_filt, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
+            # Display the matched image
+            cv2.imshow('Matches flat filt1', matched_image)
+            
+        if ( (inliers is None) or np.sum(inliers) < 3 ):
             return False, False
         
         accRotation = -( model_robust.rotation )
@@ -1046,7 +1218,7 @@ class Chunk:
         newTransVector = ( origin1+np.dot(accTrans-origin2, rotationMatrix(-accRotation)) )/ this.cachedProbabilityGrid.cellRes
         newTransVector = np.array(( newTransVector[0], newTransVector[1], accRotation ))
         
-        if ( False ): 
+        if ( showPlot ): 
             rawKP1 = np.array([ keyPoint.pt for keyPoint in thisKeypoints ]) 
             rawKP2 = np.array([ keyPoint.pt for keyPoint in otherKeypoints ]) 
             
@@ -1070,12 +1242,10 @@ class Chunk:
             matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, inMatches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
             # Display the matched image
             cv2.imshow('Matches', matched_image)
-
-            # Draw filtered matches
-            matched_image = cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flat_match_filt, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS) 
-            # Display the matched image
-            cv2.imshow('Matches flat', matched_image)
-
+ 
+            
+            #cv2.imshow('Matches flat', cv2.drawMatches(image1, thisKeypoints, image2, otherKeypoints, flat_match_filt, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS))
+  
         return newTransVector, True
 
 
@@ -1083,7 +1253,7 @@ class Chunk:
 
     """ SECTION - full chunk layer manipulation """
 
-    def centredFeaturelessErrorReduction( this, minMethod:bool ):
+    def centredFeaturelessErrorReduction( this, minMethod:bool=False ):
         """ sequentially through all children of this chunk, reducing the error using the selected reduction method
         it applies the reduction by comparing all children to the centre
            """ 
@@ -1101,21 +1271,21 @@ class Chunk:
             for targetChunk in this.subChunks:
                 if ( targetChunk != centreChunk ):
                     #centreChunk.plotDifference( targetChunk )
-                    centreChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+                    centreChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True, scoreRequired=80 )
                     #centreChunk.plotDifference( targetChunk )
                     #plt.show(block=False)
                     ""
 
-    def linearFeaturelessErrorReduction( this, skipSize ):
+    def linearFeaturelessErrorReduction( this, skipSize, scoreRequired=80, maxImpScore=80  ):
         """ sequentially through all children of this chunk, reducing the error using the selected reduction method
         it applies the reduction by comparing all children to the centre
            """  
-        for i in range(0, len(this.subChunks)):
+        for i in range(skipSize, len(this.subChunks)):
             targetChunk = this.subChunks[i]
-            if ( not targetChunk.isCentre ):
-                rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
                 
-                rootChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True )
+            rootChunk:Chunk = this.subChunks[i - skipSize]
+            
+            rootChunk.determineErrorFeaturelessDirect( targetChunk, 8, np.zeros(3), True, scoreRequired=scoreRequired, maxImpScore=maxImpScore )
     
     def centredHybridErrorReduction( this ):
         centreChunk = this.subChunks[this.centreChunkIndex]
@@ -1123,11 +1293,48 @@ class Chunk:
         for targetChunk in this.subChunks:
             if ( targetChunk != centreChunk ):
                 #centreChunk.plotDifference( targetChunk )
-                centreChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True )
-                centreChunk.determineErrorFeaturelessDirect( targetChunk, 4, np.zeros(3), True )
+                errorScore = centreChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True )[1]
+                
+                if ( not np.isnan(errorScore) ):
+                    centreChunk.determineErrorFeaturelessDirect( targetChunk, 9, np.zeros(3), True, scoreRequired=80 )
+                
                 #centreChunk.plotDifference( targetChunk )
                 #plt.show(block=False)
+                "" 
+    
+    def linearHybridErrorReduction( this, skipSize, scoreRequired=80, maxImpScore=80 ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        for i in range(skipSize, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+                
+            rootChunk:Chunk = this.subChunks[i-skipSize] #this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)] 
+            
+            adjustmentOffset, errorScore = rootChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), False, returnOnPoorScore=True )
+            
+            if ( np.isnan(errorScore) ):
+                #rootChunk.determineErrorFeaturelessDirect( targetChunk, 6, np.zeros(3), True, scoreRequired=140 )
                 ""
+            else:
+                rootChunk.determineErrorFeaturelessDirect( targetChunk, 9, adjustmentOffset, True, scoreRequired=scoreRequired, maxImpScore=maxImpScore )
+    
+    def randomHybridErrorReduction( this, scoreRequired=80, maxImpScore=80  ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        for i in range(0, len(this.subChunks)):
+            targetChunk = this.subChunks[i]
+            rootChunk:Chunk = this.subChunks[ int(np.random.random()*len(this.subChunks)) ]
+            if ( rootChunk != targetChunk ):
+                
+                adjustmentOffset, errorScore = rootChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), False, returnOnPoorScore=True )
+                
+                if ( np.isnan(errorScore) ):
+                    #rootChunk.determineErrorFeaturelessDirect( targetChunk, 6, np.zeros(3), True, scoreRequired=140 )
+                    ""
+                else:
+                    rootChunk.determineErrorFeaturelessDirect( targetChunk, 6, adjustmentOffset, True, scoreRequired=scoreRequired, maxImpScore=maxImpScore  )
      
     def linearKeypointErrorReduction( this, skipSize ):
         """ sequentially through all children of this chunk, reducing the error using the selected reduction method
@@ -1136,9 +1343,9 @@ class Chunk:
         for i in range(0, len(this.subChunks)):
             targetChunk = this.subChunks[i]
             if ( not targetChunk.isCentre ):
-                rootChunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
+                rootChunk:Chunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
                 
-                rootChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True )
+                rootChunk.determineOffsetKeypoints( targetChunk, np.zeros(3), True, scoreRequired=150 )
     
     def centredPrune( this, pruneMult=1.5, overlapMult=1.5 ):
         centreChunk = this.subChunks[this.centreChunkIndex]
@@ -1161,6 +1368,8 @@ class Chunk:
 
         pruneTargets = np.where( (errors>maxError) | (overlaps<minOverlap) )[0]
 
+        print("deleting: ",pruneTargets)
+        
         this.deleteSubChunks( pruneTargets.tolist() )
 
     def linearPrune( this, skipSize, pruneMult=1.5 ):
@@ -1170,10 +1379,10 @@ class Chunk:
         
         errors = []
 
-        for i in range(0, len(this.subChunks)):
+        for i in range(skipSize, len(this.subChunks)):
             targetChunk = this.subChunks[i]
             if ( not targetChunk.isCentre ):
-                rootChunk:Chunk = this.subChunks[i + (skipSize if i<this.centreChunkIndex else -skipSize)]
+                rootChunk:Chunk = this.subChunks[i - skipSize]
                 
                 error, overlap = rootChunk.determineDirectDifference( targetChunk )
 
@@ -1187,6 +1396,50 @@ class Chunk:
         pruneTargets = np.where( errors>maxError )[0]
 
         this.deleteSubChunks( pruneTargets.tolist() )
+
+    def repeatingHybridPrune( this, minFrameError:float, mergeMethod:list[int], maxIterations=20, errorCompSep=3 ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+        
+        if ( len(this.subChunks) == 1 ):
+            return 
+        
+        errorCompSep = min( len(this.subChunks)-1, errorCompSep )
+        
+        for I in range(0, maxIterations):
+            errors = []
+            for i in range(errorCompSep, len(this.subChunks)):
+                targetChunk = this.subChunks[i]
+                    
+                error, overlap = targetChunk.determineDirectDifference( this.subChunks[i-errorCompSep] )
+                errors.append( error ) 
+            
+            maxError = max( errors )
+            
+            if ( np.mean(np.array(errors)) < minFrameError ):
+                print( "final max error ", maxError, "  mean: ", np.mean(np.array(errors)) )
+                return
+            
+            print( "I ", I, ":   ", maxError, "  mean: ", np.mean(np.array(errors)) )
+            ""
+            for cM in mergeMethod:
+                #this.graphSLAM.plot()
+                if ( len(this.subChunks) < abs(cM)-1 ):
+                    print("would fail to error check, len: ",len(this.subChunks), " to min len ", abs(cM)-1)
+                else:
+                    if ( cM < 0 ):
+                        this.linearFeaturelessErrorReduction( -cM, minFrameError*0.7, minFrameError*0.6 ) 
+                    else:
+                        this.linearHybridErrorReduction( cM, minFrameError*0.7, minFrameError*0.6 ) 
+
+        print( "ran out of iterations: ", maxError, "  mean: ", np.mean(np.array(errors)) )
+        # errors = np.array( errors )
+        # maxError = np.median( errors )*pruneMult
+
+        # pruneTargets = np.where( errors>maxError )[0]
+
+        # this.deleteSubChunks( pruneTargets.tolist() )
 
         
         

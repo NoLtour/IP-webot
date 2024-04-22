@@ -19,7 +19,7 @@ class IPConfig:
     #CHANGE_SCALING_LIMIT_LIN    = 0.1
     #CHANGE_SCALING_LIMIT_MUL    = 3
     
-    ITERATIVE_REDUCTION_MULTIPLIER = 0.5
+    ITERATIVE_REDUCTION_MULTIPLIER = 0.4
     ITERATIVE_REDUCTION_PERMITTED_ERROR = 5
     #FEATURELESS_COMP_FACT       = 0
     #ANGLE_OVERWIRTE_THRESHOLD   = np.deg2rad( 4 )
@@ -32,7 +32,7 @@ class IPConfig:
     MAX_LIDAR_LENGTH = 8
 
     # Image estimation
-    IE_OBJECT_DIAM = 0.5 *OBJECT_DIAMETER
+    IE_OBJECT_DIAM = 0.35 *OBJECT_DIAMETER
     IE_SHARPNESS   = 4.6
 
     # Corner detector
@@ -47,5 +47,5 @@ class IPConfig:
     #DCOMP_COMPARISON_RADIUS    = 1 # The permittable mismatch between the descriptors keychannels when initially comparing 2 descriptors
     DCOMP_COMPARISON_COUNT     = 1 # The number of descriptor keychannels to used when initially comparing 2 descriptors 
  
-
+    FEATURE_COMPARISON_FILTER_DISTANCE = True
 ""

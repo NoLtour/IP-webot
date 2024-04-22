@@ -37,10 +37,13 @@ def generate1DGuassianDerivative( sigma, cutoff=0.02 ):
 
     x      = np.arange( -radius, radius+1, 1 )
     kernel = (1/(2*np.pi*sigma**2)) * np.exp(-(x**2)/(2*sigma**2))
-    kernel[radius] = 0
-    kernel /= np.sum(kernel)
     
-    grad = np.where( x<0, -kernel, kernel) #np.gradient( kernel )
+    kernel /= np.abs(kernel)
+    kernel[radius] = 0
+    
+    kernel = kernel/np.sum(kernel)
+    
+    grad = np.where( x<0, -np.abs(kernel), np.abs(kernel)) #np.gradient( kernel )
     
     dx = np.column_stack( grad )
     dy = np.transpose( dx )
@@ -50,6 +53,9 @@ def generate1DGuassianDerivative( sigma, cutoff=0.02 ):
 fplotN = 0
 def fancyPlot( inp ):
     global fplotN
+    
+    #inp = np.where( inp>0, 1, np.where( inp<0, -1, 0 ) )
+    
     plt.figure(5000+fplotN)
     fplotN += 1
     y, x = np.meshgrid(np.arange(inp.shape[1]), np.arange(inp.shape[0]))
@@ -57,8 +63,7 @@ def fancyPlot( inp ):
     cb = plt.imshow( np.where(inp==0, np.inf, inp), origin="lower" )
     plt.axis("off")
     #plt.colorbar(cb)
-
-
+ 
 def generateAngleArray(diameter): 
     """ generates a 2D array of set diameter  """
     indices = np.arange(diameter)

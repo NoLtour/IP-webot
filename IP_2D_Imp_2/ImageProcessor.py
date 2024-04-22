@@ -146,7 +146,7 @@ class ImageProcessor:
                 windowImage = np.where( np.abs( windowImage )<0.1, 0, np.where( windowImage > 0, 1, -1 ) )
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.92 ):
+                if ( np.average( np.abs(windowImage) ) > 0.8 ):
 
                     extThickness = np.zeros( (oRes) )
                     np.add.at( extThickness, angleMap, windowImage )
@@ -195,7 +195,8 @@ class ImageProcessor:
         x_coords = x_coords - radius
         y_coords = y_coords - radius
  
-        smoothKern = np.array((0.154,0.242,0.398,0.242,0.154)) 
+        smoothKern = np.array((0.154,0.242,0.398,0.242,0.154))  
+        #smoothKern = np.array((0,1,0)) 
         gaussian_array = np.array([
             [0.002969, 0.013306, 0.021938, 0.013306, 0.002969],
             [0.013306, 0.059634, 0.098320, 0.059634, 0.013306],
@@ -217,7 +218,9 @@ class ImageProcessor:
         yVecFlat = np.sin( angleSet )
          
         absImage = np.where( inpArray < 0, -1, 1 ) 
-        gDy, gDx = np.gradient( convolve2d( absImage, gaussian_array, mode="same" ) )
+        gDy, gDx = np.gradient(convolve2d(  absImage , gaussian_array, mode="same") )
+        #gDy, gDx = np.gradient( absImage )
+        #gDy, gDx = convolve2d( gDy, gaussian_array, mode="same" ), convolve2d( gDx, gaussian_array, mode="same" ) 
          
         # Iterates through each search window
         for i in range(0, pointXs.size):
@@ -232,7 +235,7 @@ class ImageProcessor:
                 windowImage = ( inpArray[ yMin:yMax, xMin:xMax ] )   
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.8 ):
+                if ( np.average( np.abs(windowImage) ) > 0.65 ):
                     dx, dy = ( gDx[ yMin:yMax, xMin:xMax ]*intrestMask ), ( gDy[ yMin:yMax, xMin:xMax ]*intrestMask )
                      
                     magnitudes = np.sqrt(dy**2 + dx**2)  
