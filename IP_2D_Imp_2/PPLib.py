@@ -16,7 +16,7 @@ from scipy.optimize import differential_evolution
 from scipy import stats
 import random
 
-from CommonLib import fancyPlot, rotationMatrix
+from CommonLib import fancyPlot, rotationMatrix, acuteAngle
 
 
 
@@ -185,7 +185,7 @@ def findDifference( inpChunk1:Chunk, inpChunk2:Chunk, initOffset, maxIterations,
     offsets.append( np.array(trueOffset) )
     errors.append( errorScore )
     
-    inpChunk1.plotDifference( inpChunk2 )
+    inpChunk1.plotDifference( inpChunk2, forcedOffset=np.zeros(3) )
     
     for i in range(0, maxIterations):
 
@@ -898,24 +898,36 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
         rootCh = parent.subChunks[i]
         targCh = parent.subChunks[i+compDistance]
         
-        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 4, scoreRequired=900, forcedOffset=np.zeros(3) )
+        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 24, scoreRequired=900, forcedOffset=np.zeros(3) )
         initVector = rootCh.getLocalOffsetFromTarget( targCh )
         newVector = initVector + offsetAdjustment
         
         trueVector = rootCh.getTRUEOffsetLocal( targCh )
         
-        initErrors.append( np.abs( initVector - trueVector ) )
-        newErrors.append( np.abs( newVector - trueVector ) )
+        initErrors.append( (np.abs( initVector[0] - trueVector[0] ), np.abs( initVector[1] - trueVector[1] ), acuteAngle( initVector[2], trueVector[2] )) )
+ 
+        newErrors.append( (np.abs( newVector[0] - trueVector[0] ), np.abs( newVector[1] - trueVector[1] ), acuteAngle( newVector[2], trueVector[2] )) )
         
-        print( "vecs:", trueVector, newVector, np.abs( newVector - trueVector ) )
+        #print( "vecs:", trueVector, newVector, np.abs( newVector - trueVector ) )
         ""
     
     initErrors = np.array( initErrors )
     newErrors  = np.array( newErrors )
-     
+    
+    np.isnan
+    
+    notNull = (1!=np.isnan(newErrors[:,0]))
+    print( "init score: ", np.mean( np.sqrt(initErrors[:,0][notNull]**2+initErrors[:,1][notNull]**2) ) )
+    print( "final score: ", np.mean( np.sqrt(newErrors[:,0][notNull]**2+newErrors[:,1][notNull]**2) ) )
+    
     plt.figure(2409)
     plt.plot( np.sqrt(initErrors[:,0]**2+initErrors[:,1]**2), "r-", label="init error" )
     plt.plot( np.sqrt(newErrors[:,0]**2+newErrors[:,1]**2), "b--", label="final error" )
+    plt.legend()
+     
+    plt.figure(2109)
+    plt.plot( (initErrors[:,2] ), "r-", label="init error" )
+    plt.plot(  (newErrors[:,2] ), "b--", label="final error" )
     plt.legend()
     plt.show( block=False )
     
@@ -977,10 +989,10 @@ def twoFramesTest( chunk1, chunk2 ):
     
     #parentChunk.subChunks[2].offsetFromParent = parentChunk.subChunks[2].offsetFromParent + np.array((0.1,0.1,0.1))
     
-    chunks[0].plotDifference( chunks[1] )
+    chunks[0].plotDifference( chunks[1], np.zeros(3) )
     offsetAdjustment, newErrorScore = chunks[0].determineErrorFeaturelessDirect( chunks[1], 15, np.zeros(3), True )
     
-    chunks[0].plotDifference( chunks[1] )
+    chunks[0].plotDifference( chunks[1], np.zeros(3) )
     
     plt.show( block=False )
     

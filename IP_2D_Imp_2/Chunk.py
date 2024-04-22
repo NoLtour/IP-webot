@@ -453,31 +453,34 @@ class Chunk:
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
-        #thisWindow, transWindow = thisWindow**3, transWindow**3
+        thisWindow = thisWindow**3
+        transWindow = transWindow**3
+        # existMask = np.abs(thisWindow*transWindow)
+        # thisWindow *= existMask
+        # transWindow *= existMask
         
         # First the search region is defined  
-        
+        intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
         
         x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
-          
+        
         #errorWindow = -np.minimum(thisWindow*transWindow, 0)
-        #errorWindow = -np.abs(thisWindow*transWindow)  
-        
+        errorWindow = -(thisWindow*transWindow)  
+
         conflictWindow = (thisWindow*transWindow) 
-        intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)*np.abs(conflictWindow)
-        
         conflictWindow = -np.minimum( conflictWindow, 0 )  
-        
-        errorWindow = (thisWindow-transWindow)*intrestMask
  
         erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
         erDy = convolve2d( errorWindow, y1DGuas, mode="same" ) 
         
-        lengthScale = np.sum(intrestMask*((thisWindow>0) + (transWindow>0))) 
+        lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0)) 
         if ( lengthScale==0 ): return 0,0,0 
-          
-        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE*conflictWindow/lengthScale
-        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE*conflictWindow/lengthScale
+        
+        erDx = conflictWindow*np.where(thisWindow<0,erDx,-erDx)/lengthScale 
+        erDy = conflictWindow*np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+         
+        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
+        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
           
         erDyMask = (np.abs(erDy)>np.max(np.abs(erDy))*0.05)
         erDxMask = (np.abs(erDx)>np.max(np.abs(erDx))*0.05)
@@ -887,7 +890,7 @@ class Chunk:
             return np.nan, np.nan
          
         for i in range(0, iterations):  
-            if ( errorScores[-1] < this.config.ITERATIVE_REDUCTION_PERMITTED_ERROR or ( i>3 and errorScores[-1]>errorScores[-3]*1.1 ) ):
+            if ( errorScores[-1] < this.config.ITERATIVE_REDUCTION_PERMITTED_ERROR or ( i>3 and errorScores[-1]>errorScores[-3]*1.4 ) ):
                 break # breaks early if the error is below some permitted threshold
             
             predictedErrors = np.array(this.determineErrorFeatureless3( otherChunk, forcedOffset, False ))

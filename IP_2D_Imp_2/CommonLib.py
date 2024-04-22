@@ -10,6 +10,12 @@ import matplotlib.pyplot as plt
     )
     return kernel / np.sum(kernel)"""
 
+def acuteAngle( theta1:np.ndarray, theta2:np.ndarray ):
+    theta1 = (np.pi*14 + theta1)%(np.pi*2)
+    theta2 = (np.pi*14 + theta2)%(np.pi*2)
+    
+    return min( abs(theta1-theta2), 2*np.pi-abs(theta1-theta2) )
+
 def rotationMatrix(theta):
     """ Generate a 2x2 rotation matrix for a given angle theta (in radians). """
     cos_theta = np.cos(theta)
