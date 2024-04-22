@@ -446,41 +446,41 @@ class Chunk:
     
     """ SECTION - chunk comparison """
 
-    def determineErrorFeatureless3( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ):
+    def determineErrorFeatureless3( this, otherChunk:Chunk, forcedOffset:np.ndarray, showPlot=False ):
         """ estimates the poitional error between two images without using features, the error is given in this chunks local refrance frame """
 
         localToTargetVector = this.getLocalOffsetFromTarget( otherChunk ) + forcedOffset
 
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
-        thisWindow, transWindow = thisWindow**3, transWindow**3
+        #thisWindow, transWindow = thisWindow**3, transWindow**3
         
         # First the search region is defined  
-        intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
+        
         
         x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
-        
-        errorWindow = -np.minimum(thisWindow*transWindow, 0)
+          
+        #errorWindow = -np.minimum(thisWindow*transWindow, 0)
         #errorWindow = -np.abs(thisWindow*transWindow)  
-        errorWindow = (thisWindow-transWindow)*np.abs(thisWindow*transWindow)  
-
+        
         conflictWindow = (thisWindow*transWindow) 
+        intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)*np.abs(conflictWindow)
+        
         conflictWindow = -np.minimum( conflictWindow, 0 )  
+        
+        errorWindow = (thisWindow-transWindow)*intrestMask
  
         erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
         erDy = convolve2d( errorWindow, y1DGuas, mode="same" ) 
         
         lengthScale = np.sum(intrestMask*((thisWindow>0) + (transWindow>0))) 
         if ( lengthScale==0 ): return 0,0,0 
-        
-        erDx = conflictWindow*np.where(thisWindow<0,erDx,erDx)/lengthScale 
-        erDy = conflictWindow*np.where(thisWindow<0,erDy,erDy)/lengthScale  
-         
-        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
-        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
           
-        erDyMask = (np.abs(erDy)>np.max(np.abs(erDy))*0.001)
-        erDxMask = (np.abs(erDx)>np.max(np.abs(erDx))*0.001)
+        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE*conflictWindow/lengthScale
+        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE*conflictWindow/lengthScale
+          
+        erDyMask = (np.abs(erDy)>np.max(np.abs(erDy))*0.05)
+        erDxMask = (np.abs(erDx)>np.max(np.abs(erDx))*0.05)
         
         xError = np.sum(erDx)
         yError = np.sum(erDy)
@@ -872,8 +872,9 @@ class Chunk:
         
         return foundDirectionErrors, errorScore, 1
 
-    def determineErrorFeaturelessDirect( this, otherChunk:Chunk, iterations:int, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False, scoreRequired=99999999, maxImpScore=0 ):
+    def determineErrorFeaturelessDirect( this, otherChunk:Chunk, iterations:int, forcedOffset:np.ndarray, updateOffset=False, scoreRequired=99999999, maxImpScore=0 ):
         """ This finds the relative offset between two chunks without using features, using the custom method """
+        forcedOffset = forcedOffset.copy()
         
         errorScores = []
         offsetValues = []
@@ -919,7 +920,7 @@ class Chunk:
         print( "did it:",newErrorScore )
         return offsetAdjustment, newErrorScore
     
-    def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), updateOffset=False, scoreRequired=99999999, returnOnPoorScore=False, maxImpScore=0 ):
+    def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray, updateOffset=False, scoreRequired=99999999, returnOnPoorScore=False, maxImpScore=0 ):
         """ This finds the relative offset between two chunks using features  """
           
         initErrorScore = ( this.determineDirectDifference( otherChunk, forcedOffset )[0] )
@@ -949,7 +950,7 @@ class Chunk:
         
         return adjustmentOffset, newErrorScore
     
-    def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), completeOffsetOverride=False ):
+    def determineDirectDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray, completeOffsetOverride=False ):
         """ determines the error between two images without using features """
         
         localToTargetVector = this.getLocalOffsetFromTarget( otherChunk ) + forcedOffset
@@ -979,7 +980,7 @@ class Chunk:
 
         return errorScore, mArea
         
-    def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), offsetTotalOverwrite=False ):
+    def plotDifference( this, otherChunk:Chunk, forcedOffset:np.ndarray, offsetTotalOverwrite=False ):
         """ determines the error between two images without using features """
 
         transOffset = otherChunk.getOffset()
@@ -1039,7 +1040,7 @@ class Chunk:
 
         return thisWindow, transWindow
 
-    def determineErrorKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray=np.zeros(3), showPlot=False ): 
+    def determineErrorKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray, showPlot=False ): 
         this.cachedProbabilityGrid.extractDescriptors()
         otherChunk.cachedProbabilityGrid.extractDescriptors()
 
@@ -1412,7 +1413,7 @@ class Chunk:
             for i in range(errorCompSep, len(this.subChunks)):
                 targetChunk = this.subChunks[i]
                     
-                error, overlap = targetChunk.determineDirectDifference( this.subChunks[i-errorCompSep] )
+                error, overlap = targetChunk.determineDirectDifference( this.subChunks[i-errorCompSep], forcedOffset=np.zeros(3) )
                 errors.append( error ) 
             
             maxError = max( errors )

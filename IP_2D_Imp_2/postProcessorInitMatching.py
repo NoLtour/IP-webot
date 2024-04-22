@@ -83,20 +83,20 @@ gridDisp      = pl.gridDisp
 gridDisp2     = pl.gridDisp2
 
 def testtt():
-    pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
     
     target1 = pl.getChunk( allScanData, 700 )
     target2 = pl.getChunk( allScanData, 700 )
     
-    # pl.findDifference( target1, target2, np.array((0.1,0,0)), 100, True  )
+    pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
+    #pl.findDifference( target1, target2, np.array((0.2,0.5,0.4)), 100, True  )
     
-    mmm = pl.getChunk( allScanData, 0 )
-    fancyPlot( mmm.constructProbabilityGrid().mapEstimate )
-    pl.featurelessFullTest( mmm )
+    # mmm = pl.getChunk( allScanData, 320 )
+    # fancyPlot( mmm.constructProbabilityGrid().mapEstimate )
+    # pl.featurelessFullTest( mmm )
     
     # pl.twoFramesTest( target1, target2 )
     
-    procScans = pl.getBaseChunks(allScanData, 300, 5, 500 )
+    procScans = pl.getBaseChunks(allScanData, 0, 5, 500 )
     merged1 = pl.mapMergeTestRec( procScans, 99999999, [], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     parent = merged1[0]
     
