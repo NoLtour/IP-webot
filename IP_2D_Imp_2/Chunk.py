@@ -455,42 +455,38 @@ class Chunk:
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
         thisWindow = thisWindow**3
         transWindow = transWindow**3
-        # existMask = np.abs(thisWindow*transWindow)
-        # thisWindow *= existMask
-        # transWindow *= existMask
+        existMask = np.abs(thisWindow*transWindow)
+        thisWindow *= existMask
+        transWindow *= existMask
         
         # First the search region is defined  
         intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
         
-        x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/2)
-        
-        #errorWindow = -np.minimum(thisWindow*transWindow, 0)
-        errorWindow = -(thisWindow*transWindow)  
-
-        conflictWindow = (thisWindow*transWindow) 
-        conflictWindow = -np.minimum( conflictWindow, 0 )  
- 
-        erDx = convolve2d( errorWindow, x1DGuas, mode="same" )
-        erDy = convolve2d( errorWindow, y1DGuas, mode="same" ) 
-        
-        lengthScale = np.sum(thisWindow*intrestMask*(thisWindow>0)) 
-        if ( lengthScale==0 ): return 0,0,0 
-        
-        erDx = conflictWindow*np.where(thisWindow<0,erDx,-erDx)/lengthScale 
-        erDy = conflictWindow*np.where(thisWindow<0,erDy,-erDy)/lengthScale  
+        x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/6)
          
-        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE
-        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE
+        errorWindow = thisWindow-transWindow 
+  
+        lengthScale = min( np.sum(np.maximum(0, thisWindow)), np.sum(np.maximum(0, transWindow)) ) 
+        if ( lengthScale==0 ): return 0,0,0  
+ 
+        erDx = convolve2d( errorWindow, x1DGuas, mode="same" )*intrestMask
+        erDy = convolve2d( errorWindow, y1DGuas, mode="same" )*intrestMask
+         
+        erDx = erDx*this.config.FEATURELESS_X_ERROR_SCALE/lengthScale 
+        erDy = erDy*this.config.FEATURELESS_Y_ERROR_SCALE/lengthScale 
           
         erDyMask = (np.abs(erDy)>np.max(np.abs(erDy))*0.05)
         erDxMask = (np.abs(erDx)>np.max(np.abs(erDx))*0.05)
         
         xError = np.sum(erDx)
         yError = np.sum(erDy)
+        
+        if ( showPlot ):
+            ""
 
         rows, cols = errorWindow.shape  
         x_coords, y_coords = np.meshgrid(np.arange(cols), np.arange(rows)) 
-        origin = (localToTargetVector[0]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.xAMin, localToTargetVector[1]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.yAMin)
+        origin = (0*localToTargetVector[0]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.xAMin, 0*localToTargetVector[1]*this.cachedProbabilityGrid.cellRes-this.cachedProbabilityGrid.yAMin)
         x_offset = (x_coords - origin[0])
         y_offset = (y_coords - origin[1]) 
 
@@ -499,16 +495,13 @@ class Chunk:
         x_tangential_vector = y_offset/sepLen
         y_tangential_vector = -x_offset/sepLen 
 
-        erDa = -(x_tangential_vector*( erDxMask*(np.sum(erDx)/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(np.sum(erDy)/np.sum(erDyMask)) ))
+        erDa = -(x_tangential_vector*( erDxMask*(xError/np.sum(erDxMask)) ) + y_tangential_vector*(erDyMask*(yError/np.sum(erDyMask)) ))
         erDa = -(x_tangential_vector*erDx + y_tangential_vector*erDy) - erDa 
 
         angleError = np.sum(erDa) * this.config.FEATURELESS_A_ERROR_SCALE
         if ( np.isnan(angleError) ):
             angleError = 0 # TODO fix it
-
-
-        errorWindow *= thisWindow<0
-        errorWindow = np.where( (errorWindow)==0, np.inf, errorWindow ) 
+ 
 
         if ( showPlot ):
             #fancyPlot( thisWindow )

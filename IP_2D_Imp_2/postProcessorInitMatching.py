@@ -33,7 +33,10 @@ print("imported")
 np.random.seed(3115)
 
 if (True):
-    allPoseChanges = []
+    allPoseChanges = [ (0,0) ]
+    cccc = []
+        
+    cumulativeError = CartesianPose.zero()
     for i in range(0,len(allScanData)): 
         cScan:RawScanFrame = allScanData[i]
         
@@ -41,32 +44,55 @@ if (True):
             pScan:RawScanFrame = allScanData[i-1]
             
             interFrameChange = cScan.pose.copy()
-            interFrameChange.subtractPose( pScan.pose )
-            interFrameChange.divide( 0.9  + 0.1*(np.random.random()*2-1))
-            size = (abs(interFrameChange.x)+abs(interFrameChange.y))*3
-            interFrameChange.addPose( CartesianPose( (np.random.random()-0.5)*size, (np.random.random()-0.5)*size, 0, 0, 0, -size*0.5 ) )
+            interFrameChange.subtractPose( pScan.pose ) 
+        
+            sepLength = np.sqrt( interFrameChange.x**2 + interFrameChange.y**2 )
+            beta = np.arctan2( interFrameChange.y, interFrameChange.x )
+            newBeta = beta - cScan.pose.yaw
+            localOffset = np.array((sepLength*np.cos( newBeta ), sepLength*np.sin( newBeta ), interFrameChange.yaw ))
             
-            allPoseChanges.append(interFrameChange)
+            noiseScale = 0.4
+            staticDriftAngle = 0.002
             
+            scaleFactor = 1.5
+            
+            allPoseChanges.append( (scaleFactor*(sepLength*(1+(np.random.random()-0.5)*noiseScale*2) ), scaleFactor*(staticDriftAngle+interFrameChange.yaw)*(1+(np.random.random()-0.5)*noiseScale*2)) )
+            
+            cccc.append( interFrameChange.x**2 + interFrameChange.y**2 )
             ""
         
         cScan.index = i 
+    
+    
+    cccc2 = []
+    
+    tXp = 0
+    tYp = 0
+    tAp = 0
+    
     for i in range(0,len(allScanData)): 
         cScan:RawScanFrame = allScanData[i]
         
-        if (i!=0):
-            pScan:RawScanFrame = allScanData[i-1]
-            interFrameChange = allPoseChanges[i-1]
-            
-            cScan.pose = pScan.pose.copy()
-            cScan.pose.addPose( interFrameChange )
-            
-            ""
+        sepChange, angChange = allPoseChanges[i]
+        
+        tXp += sepChange*np.cos( tAp )
+        tYp += sepChange*np.sin( tAp )
+        tAp += angChange
+        
+        cScan.pose = CartesianPose( tXp, tYp, 0,0,0, tAp )
         
         cScan.index = i 
+
+    
+    # plt.figure(5)
+    # plt.plot( cccc2 )
+    # plt.show(block=False)
+    ""
     
     
-#pl.plotPathError( allScanData )
+ 
+
+
 
 config = IPConfig()
 
@@ -84,14 +110,14 @@ gridDisp2     = pl.gridDisp2
 
 def testtt():
     
-    target1 = pl.getChunk( allScanData, 700 )
-    target2 = pl.getChunk( allScanData, 704 )
+    target1 = pl.getChunk( allScanData, 0 )
+    target2 = pl.getChunk( allScanData, 0 )
     
     #pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
     #pl.findDifference( target1, target2, np.array((0.2,0.0,0.0)), 100, True  )
+    #pl.twoFramesTest( target1, target2 )
     pl.meanFeaturelessAutoTune( allScanData, 8 ) 
     
-    #pl.twoFramesTest( target1, target2 )
     mmm = pl.getChunk( allScanData, 0 )
     fancyPlot( mmm.constructProbabilityGrid().mapEstimate )
     pl.featurelessFullTest( mmm )
@@ -101,10 +127,12 @@ def testtt():
     merged1 = pl.mapMergeTestRec( procScans, 99999999, [], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     parent = merged1[0]
     
-    pl.minimiserEffectivenessTest( parent, 55550, 1 )
+    pl.minimiserEffectivenessTest( parent, 55550, 4 )
     
     ""
-    
+
+#pl.plotPathError( allScanData ) 
+
 testtt()
  
 def test1ChunkExport(): 
@@ -112,8 +140,8 @@ def test1ChunkExport():
     
     #pl.config.FEATURELESS_X_ERROR_SCALE,pl.config.FEATURELESS_Y_ERROR_SCALE,pl.config.FEATURELESS_A_ERROR_SCALE = 2, 2, 0.1 
  
-    procScans = pl.getBaseChunks(allScanData, 0, 30, 99999999 )
-    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ 1, 2 ], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
+    procScans = pl.getBaseChunks(allScanData, 0, 60, 99999999 )
+    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ 4,3,9,8,7,6,5,2,1,-3 ], minFrameError=110 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     merged1[0].graphSLAM.plot() 
     
     merged1[0].randomHybridErrorReduction( 90 )

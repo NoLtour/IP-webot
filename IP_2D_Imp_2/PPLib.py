@@ -138,7 +138,7 @@ def featurelessFullTest( inpChunk ):
 
     plt.show( block=False )
 
-def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(6) ):
+def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(4) ):
     inpChunk.config.FEATURELESS_X_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_Y_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_A_ERROR_SCALE = 0
@@ -898,7 +898,7 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
         rootCh = parent.subChunks[i]
         targCh = parent.subChunks[i+compDistance]
         
-        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 24, scoreRequired=900, forcedOffset=np.zeros(3) )
+        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 5, scoreRequired=260, forcedOffset=np.zeros(3) )
         initVector = rootCh.getLocalOffsetFromTarget( targCh )
         newVector = initVector + offsetAdjustment
         
@@ -919,8 +919,11 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
     notNull = (1!=np.isnan(newErrors[:,0]))
     print( "init score: ", np.mean( np.sqrt(initErrors[:,0][notNull]**2+initErrors[:,1][notNull]**2) ) )
     print( "final score: ", np.mean( np.sqrt(newErrors[:,0][notNull]**2+newErrors[:,1][notNull]**2) ) )
+    print( "Ainit score: ", np.mean( initErrors[:,2][notNull] ) )
+    print( "Afinal score: ", np.mean( newErrors[:,2][notNull] ) )
     
     plt.figure(2409)
+    plt.title( "Translation Error" )
     plt.plot( np.sqrt(initErrors[:,0]**2+initErrors[:,1]**2), "r-", label="init error" )
     plt.plot( np.sqrt(newErrors[:,0]**2+newErrors[:,1]**2), "b--", label="final error" )
     plt.legend()
@@ -929,6 +932,7 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
     plt.plot( (initErrors[:,2] ), "r-", label="init error" )
     plt.plot(  (newErrors[:,2] ), "b--", label="final error" )
     plt.legend()
+    plt.title( "Angle Error" )
     plt.show( block=False )
     
     ""
@@ -990,7 +994,8 @@ def twoFramesTest( chunk1, chunk2 ):
     #parentChunk.subChunks[2].offsetFromParent = parentChunk.subChunks[2].offsetFromParent + np.array((0.1,0.1,0.1))
     
     chunks[0].plotDifference( chunks[1], np.zeros(3) )
-    offsetAdjustment, newErrorScore = chunks[0].determineErrorFeaturelessDirect( chunks[1], 15, np.zeros(3), True )
+    #offsetAdjustment, newErrorScore = chunks[0].determineErrorFeaturelessDirect( chunks[1], 15, np.array((0.0,0,0)), True )
+    #offsetAdjustment, newErrorScore = chunks[0].determineErrorFeatureless3( chunks[1],  np.array((0,0,0)), True )
     
     chunks[0].plotDifference( chunks[1], np.zeros(3) )
     
