@@ -455,9 +455,9 @@ class Chunk:
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) ) 
         thisWindow = thisWindow**3
         transWindow = transWindow**3
-        existMask = np.abs(thisWindow*transWindow)
-        thisWindow *= existMask
-        transWindow *= existMask
+        # existMask = np.abs(thisWindow*transWindow)
+        # thisWindow *= existMask
+        # transWindow *= existMask
         
         # First the search region is defined  
         intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
@@ -468,7 +468,9 @@ class Chunk:
         
         lengthScale = min( np.sum(np.maximum(0, thisWindow)), np.sum(np.maximum(0, transWindow)) ) 
         if ( lengthScale==0 ): return 0,0,0  
- 
+
+        errorWindow = (thisWindow-transWindow)*np.abs(thisWindow*transWindow)
+        
         erDx = convolve2d( errorWindow, x1DGuas, mode="same" )*intrestMask
         erDy = convolve2d( errorWindow, y1DGuas, mode="same" )*intrestMask
          

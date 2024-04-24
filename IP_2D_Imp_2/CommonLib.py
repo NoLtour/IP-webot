@@ -69,7 +69,7 @@ def fancyPlot( inp ):
     y, x = np.meshgrid(np.arange(inp.shape[1]), np.arange(inp.shape[0]))
     plt.imshow( np.ones(inp.shape), cmap="gray", origin="lower", vmin=0, vmax=1 )
     cb = plt.imshow( np.where(inp==0, np.inf, inp), origin="lower" )
-    plt.axis("off")
+    #plt.axis("off")
     #plt.colorbar(cb)
  
 def generateAngleArray(diameter): 

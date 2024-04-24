@@ -113,27 +113,27 @@ def testtt():
     target1 = pl.getChunk( allScanData, 0 )
     target2 = pl.getChunk( allScanData, 0 )
     
-    #pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
     #pl.findDifference( target1, target2, np.array((0.2,0.0,0.0)), 100, True  )
     #pl.twoFramesTest( target1, target2 )
-    pl.meanFeaturelessAutoTune( allScanData, 8 ) 
+    pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
+    #pl.meanFeaturelessAutoTune( allScanData, 8 ) 
     
     mmm = pl.getChunk( allScanData, 0 )
     fancyPlot( mmm.constructProbabilityGrid().mapEstimate )
     pl.featurelessFullTest( mmm )
     
     # pl.twoFramesTest( target1, target2 )
-    procScans = pl.getBaseChunks(allScanData, 0, 10, 9999999 )
+    procScans = pl.getBaseChunks(allScanData, 0, 20, 9999999 )
     merged1 = pl.mapMergeTestRec( procScans, 99999999, [], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     parent = merged1[0]
     
-    pl.minimiserEffectivenessTest( parent, 55550, 4 )
+    pl.minimiserEffectivenessTest( parent, 55550, 2 )
     
     ""
 
 #pl.plotPathError( allScanData ) 
 
-#testtt()
+testtt()
  
 def test1ChunkExport(): 
     pl.meanFeaturelessAutoTune( allScanData, 6 )
@@ -155,6 +155,7 @@ def test1ChunkExport():
     asRaws = merged1[0].exportAsRaws()
 
     #RawScanFrame.exportScanFrames( asRaws, "TEST2_LinearMatchedData-2.2" )
+    #fancyPlot( merged1[0].constructProbabilityGrid().mapEstimate )
 
     asChunkz = Chunk.initFromProcessedScanStack( asRaws, 30, config )
 
