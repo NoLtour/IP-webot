@@ -462,10 +462,10 @@ class Chunk:
         # First the search region is defined  
         intrestMask = np.minimum((thisWindow>0.01)+(transWindow>0.01), 1)
         
-        x1DGuas, y1DGuas = generate1DGuassianDerivative(this.config.FEATURELESS_PIX_SEARCH_DIAM/6)
+        x1DGuas, y1DGuas = generate1DGuassianDerivative(2)
          
         errorWindow = thisWindow-transWindow 
-  
+        
         lengthScale = min( np.sum(np.maximum(0, thisWindow)), np.sum(np.maximum(0, transWindow)) ) 
         if ( lengthScale==0 ): return 0,0,0  
  

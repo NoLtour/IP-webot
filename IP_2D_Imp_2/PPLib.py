@@ -898,7 +898,7 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
         rootCh = parent.subChunks[i]
         targCh = parent.subChunks[i+compDistance]
         
-        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 5, scoreRequired=260, forcedOffset=np.zeros(3) )
+        offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 10, scoreRequired=260, forcedOffset=np.zeros(3) )
         initVector = rootCh.getLocalOffsetFromTarget( targCh )
         newVector = initVector + offsetAdjustment
         

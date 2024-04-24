@@ -55,7 +55,9 @@ def generate1DGuassianDerivative( sigma, cutoff=0.02 ):
     dy = np.transpose( dx )
     
     return dx, dy
- 
+
+
+
 fplotN = 0
 def fancyPlot( inp ):
     global fplotN

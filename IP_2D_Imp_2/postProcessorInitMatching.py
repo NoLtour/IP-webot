@@ -24,7 +24,7 @@ import PPLib as pl
 
 print("importing...")
 #allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST2_rawInpData-2" )
-allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-3" )
+allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-4" )
 print("imported")
 
 
@@ -133,25 +133,25 @@ def testtt():
 
 #pl.plotPathError( allScanData ) 
 
-testtt()
+#testtt()
  
 def test1ChunkExport(): 
     pl.meanFeaturelessAutoTune( allScanData, 6 )
     
     #pl.config.FEATURELESS_X_ERROR_SCALE,pl.config.FEATURELESS_Y_ERROR_SCALE,pl.config.FEATURELESS_A_ERROR_SCALE = 2, 2, 0.1 
  
-    procScans = pl.getBaseChunks(allScanData, 0, 60, 99999999 )
-    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ 4,3,9,8,7,6,5,2,1,-3 ], minFrameError=110 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
+    procScans = pl.getBaseChunks(allScanData, 0, 10, 99999999 )
+    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ -1,4,3,9,8,7,6,5,2,1,-3,-6 ], minFrameError=100 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     merged1[0].graphSLAM.plot() 
     
-    merged1[0].randomHybridErrorReduction( 90 )
-    merged1[0].randomHybridErrorReduction( 90 )
-    merged1[0].randomHybridErrorReduction( 90 )
-    merged1[0].randomHybridErrorReduction( 90 )
+    # merged1[0].randomHybridErrorReduction( 60 )
+    # merged1[0].randomHybridErrorReduction( 60 )
+    # merged1[0].randomHybridErrorReduction( 60 )
+    # merged1[0].randomHybridErrorReduction( 60 )
     merged1[0].graphSLAM.plot() 
     #merged1 = pl.mapMergeTestRec( procScans, 12, [ 1, 5, 4, 3, 2 ] )
-
-
+    
+    #merged1[0].repeatingHybridPrune( 90, [-6,-5,20,19,18,17,16,15,14,13,12,10] )
     asRaws = merged1[0].exportAsRaws()
 
     #RawScanFrame.exportScanFrames( asRaws, "TEST2_LinearMatchedData-2.2" )

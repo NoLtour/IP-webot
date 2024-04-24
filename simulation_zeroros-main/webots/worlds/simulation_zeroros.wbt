@@ -104,7 +104,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -4.01 0 0.4
+  translation -0.99 3.03 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -134,7 +134,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -4.01 2 0.4
+  translation -3.95 2 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -150,6 +150,36 @@ DEF PINK_OBJECT3 Solid {
     }
   ]
   name "pink object 3(7)"
+  boundingObject DEF PCYL Shape {
+    appearance PBRAppearance {
+      baseColor 1 0.1 0.3
+      roughness 0.16827074099999995
+      metalness 0
+    }
+    geometry DEF PCYL Cylinder {
+      height 0.8
+      radius 0.3
+      subdivision 20
+    }
+  }
+}
+DEF PINK_OBJECT3 Solid {
+  translation 1.06 2 0.4
+  children [
+    DEF CYLINDER_SHAPE Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.16827074099999995
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.8
+        radius 0.3
+        subdivision 20
+      }
+    }
+  ]
+  name "pink object 3(10)"
   boundingObject DEF PCYL Shape {
     appearance PBRAppearance {
       baseColor 1 0.1 0.3
@@ -307,7 +337,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999997972 0.075
+        translation 0 0.13499999999997966 0.075
         rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
