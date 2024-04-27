@@ -108,15 +108,16 @@ lpWindow = pl.lpWindow
 gridDisp      = pl.gridDisp
 gridDisp2     = pl.gridDisp2
 
-def testtt():
-    
+def testtt(): 
     target1 = pl.getChunk( allScanData, 0 )
     target2 = pl.getChunk( allScanData, 0 )
     
+    #pl.errorTester( target1 )
+    
     #pl.findDifference( target1, target2, np.array((0.2,0.0,0.0)), 100, True  )
     #pl.twoFramesTest( target1, target2 )
-    pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
-    #pl.meanFeaturelessAutoTune( allScanData, 8 ) 
+    #pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
+    pl.meanFeaturelessAutoTune( allScanData, 8 ) 
     
     mmm = pl.getChunk( allScanData, 0 )
     fancyPlot( mmm.constructProbabilityGrid().mapEstimate )

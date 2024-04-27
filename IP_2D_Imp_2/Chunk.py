@@ -956,8 +956,10 @@ class Chunk:
         # Overlap is extracted
         thisWindow, transWindow = this.copyOverlaps( otherChunk, localToTargetVector[2], (localToTargetVector[0],localToTargetVector[1]) )
 
-        thisPositive = thisWindow>0
-        thisWindow = np.where( thisPositive, thisWindow*10, thisWindow )
+        thisPositive  = np.maximum( thisWindow,  0 )
+        transPositive = np.maximum( transWindow, 0 )
+        #thisWindow = np.where( thisPositive, thisWindow*10, thisWindow )
+        #transWindow = np.where( transPositive, transWindow*10, transWindow )
         #posThisWin = np.where( thisWindow>0, thisWindow, 0 )
         #posTransWin = np.where( transWindow>0, thisWindow, 0 )
 
@@ -965,16 +967,15 @@ class Chunk:
 
         errorWindow = (thisWindow*transWindow)
         #mArea = np.sum(np.abs(errorWindow) ) 
-        mArea = np.sum(np.abs(thisPositive*errorWindow) ) 
+        mArea = np.sum( (thisPositive+transPositive)*np.abs(errorWindow) ) 
         
-        #if (mArea<10): return np.nan, np.nan
-
-        errorWindow = -np.minimum( errorWindow, 0 ) 
+        #if (mArea<10): return np.nan, np.nan 
+        misMatchWindow = -np.minimum( errorWindow, 0 ) 
         
         if ( mArea == 0 or mArea<20 ):
             return 1000000000, 0
 
-        errorScore = 1000*np.sum(errorWindow)/mArea
+        errorScore = 1000*np.sum(misMatchWindow)/mArea
 
         return errorScore, mArea
         
