@@ -3,7 +3,7 @@ import numpy as np
  
 from scipy.signal import convolve2d
 from scipy.ndimage import laplace, maximum_filter, minimum_filter, zoom
-from CommonLib import solidCircle, gaussianKernel, convolveWithEdgeWrap
+from CommonLib import solidCircle, gaussianKernel, convolveWithEdgeWrap, fancyPlot
 import random
 
 import matplotlib.pyplot as plt
@@ -42,7 +42,7 @@ class ImageProcessor:
         localIntensities = inpArray[ localMaximums ]
   
         if ( threshHold == -1 ):
-            threshHold = np.max( np.abs(localIntensities) ) * 0.2
+            threshHold = np.max( np.abs(localIntensities) ) * 0.35
         
         mask = np.where( np.abs(localIntensities) > threshHold )
  
@@ -103,9 +103,10 @@ class ImageProcessor:
         return np.array(outputs)
  
     @staticmethod
-    def extractThicknesses( inpArray:np.ndarray, pointXs:np.ndarray, pointYs:np.ndarray, radius:int, oRes=12 ):
+    def extractThicknesses( inpArray:np.ndarray, pointXs:np.ndarray, pointYs:np.ndarray, radius:int, oRes=12, plotThingy=False  ):
         """ Produces a histogram with the centre shifted to be inline with the exponentially weighted "centre of mass" """
-   
+        #oRes = 80
+        
         outputs = []
         positions = []
         mainAngle = []
@@ -117,6 +118,7 @@ class ImageProcessor:
 
         smoothKern = np.array((0.054,0.242,0.398,0.242,0.054)) 
         smoothKern = np.array((0.154,0.242,0.398,0.242,0.154)) 
+        smoothKern = np.array(( 0.142,0.398,0.142 )) 
         
         intrestMask = (x_coords**2 + y_coords**2) < ((radius+0.5)**2)
         intrestMask[radius,radius] = 0
@@ -153,7 +155,7 @@ class ImageProcessor:
                     extThickness = extThickness/scaleFactors
                     extThickness = convolveWithEdgeWrap( extThickness, smoothKern )
     
-                    avrgAngle = np.arctan2( np.sum(yVecFlat*(extThickness**3)), np.sum(xVecFlat*(extThickness**3)) )
+                    avrgAngle = np.arctan2( np.sum(yVecFlat*(extThickness**5)), np.sum(xVecFlat*(extThickness**5)) )
                     avrgAngle = np.pi*2+avrgAngle if avrgAngle<0 else avrgAngle
                     avrgIndex = int(0.5+oRes*avrgAngle/(np.pi*2))
                     mainAngle.append( avrgAngle )    
@@ -164,13 +166,24 @@ class ImageProcessor:
                     positions.append( ( pointXs[i], pointYs[i] ) )
 
                 
-                #     plt.figure( 415 )
-                #     plt.clf()
-                #     plt.imshow( windowImage + np.where( intrestMask,0, np.inf), origin="lower" )  
-                #     plt.figure( 4135 )
-                #     plt.clf()
-                #     plt.plot( alignedThickness ) 
-                #     plt.show( block=False )
+                    if ( plotThingy ):
+                        plt.figure( 415 )
+                        plt.clf()
+                        plt.imshow( windowImage + np.where( intrestMask,0, np.inf), origin="lower" )  
+                        plt.figure( 4135 )
+                        plt.clf()
+                        plt.title("Aligned angle histogram")
+                        plt.ylabel("frequency")
+                        plt.xlabel("channel")
+                        plt.bar( np.arange(oRes), alignedThickness ) 
+                        plt.figure( 4136 )
+                        plt.clf()
+                        plt.title("Unaligned angle histogram")
+                        plt.bar( np.arange(oRes), extThickness ) 
+                        plt.ylabel("frequency")
+                        plt.xlabel("channel")
+                        plt.show( block=False )
+                        ""
                 # else:
                 #     plt.figure( 415 )
                 #     plt.imshow( windowImage, origin="lower" )  
@@ -183,9 +196,8 @@ class ImageProcessor:
     
     
     @staticmethod
-    def extractGradients( inpArray:np.ndarray, pointXs:np.ndarray, pointYs:np.ndarray, radius:int, oRes=12 ):
+    def extractGradients( inpArray:np.ndarray, pointXs:np.ndarray, pointYs:np.ndarray, radius:int, oRes=12, plotThingy=False ):
         """ Produces a histogram with the centre shifted to be inline with the exponentially weighted "centre of mass" """
-   
         outputs = []
         positions = []
         mainAngle = []
@@ -196,6 +208,7 @@ class ImageProcessor:
         y_coords = y_coords - radius
  
         smoothKern = np.array((0.154,0.242,0.398,0.242,0.154))  
+        smoothKern = np.array((0.05,0.2,0.05))  
         #smoothKern = np.array((0,1,0)) 
         gaussian_array = np.array([
             [0.002969, 0.013306, 0.021938, 0.013306, 0.002969],
@@ -210,6 +223,7 @@ class ImageProcessor:
             [0.059634, 0.098320, 0.059634] 
         ])
         
+        
         intrestMask = (x_coords**2 + y_coords**2) < ((radius+0.5)**2)
         intrestMask[radius,radius] = 0  
         
@@ -217,8 +231,8 @@ class ImageProcessor:
         xVecFlat = np.cos( angleSet )
         yVecFlat = np.sin( angleSet )
          
-        absImage = np.where( inpArray < 0, -1, 1 ) 
-        gDy, gDx = np.gradient(convolve2d(  absImage , gaussian_array, mode="same") )
+        absImage = convolve2d(np.where( inpArray < 0, -1, 1 )  , gaussian_array, mode="same")
+        gDy, gDx = np.gradient(  absImage )
         #gDy, gDx = np.gradient( absImage )
         #gDy, gDx = convolve2d( gDy, gaussian_array, mode="same" ), convolve2d( gDx, gaussian_array, mode="same" ) 
          
@@ -235,7 +249,7 @@ class ImageProcessor:
                 windowImage = ( inpArray[ yMin:yMax, xMin:xMax ] )   
                 
                 # Discriminator to ensure images have a high level of certainty assosiated with them
-                if ( np.average( np.abs(windowImage) ) > 0.65 ):
+                if ( np.average( np.abs(windowImage) ) > 0.065 ):
                     dx, dy = ( gDx[ yMin:yMax, xMin:xMax ]*intrestMask ), ( gDy[ yMin:yMax, xMin:xMax ]*intrestMask )
                      
                     magnitudes = np.sqrt(dy**2 + dx**2)  
@@ -256,14 +270,25 @@ class ImageProcessor:
                     outputs.append( alignedGradHist )
                     positions.append( ( pointXs[i], pointYs[i] ) )
 
-                
-                #     plt.figure( 415 )
-                #     plt.clf()
-                #     plt.imshow( windowAbsImage + np.where( intrestMask,0, np.inf), origin="lower" )  
-                #     plt.figure( 4135 )
-                #     plt.clf()
-                #     plt.plot( alignedGradHist ) 
-                #     plt.show( block=False )
+
+                    if ( plotThingy ):
+                        plt.figure( 415 )
+                        plt.clf()
+                        plt.imshow( windowAbsImage + np.where( intrestMask,0, np.inf), origin="lower" )  
+                        plt.figure( 4135 )
+                        plt.clf()
+                        plt.title("Aligned angle histogram")
+                        plt.ylabel("frequency")
+                        plt.xlabel("channel")
+                        plt.bar( np.arange(oRes), alignedGradHist ) 
+                        plt.figure( 4136 )
+                        plt.clf()
+                        plt.title("Unaligned angle histogram")
+                        plt.bar( np.arange(oRes), gradHist ) 
+                        plt.ylabel("frequency")
+                        plt.xlabel("channel")
+                        plt.show( block=False )
+                        ""
                 # else:
                 #     plt.figure( 415 )
                 #     plt.imshow( windowAbsImage, origin="lower" )  

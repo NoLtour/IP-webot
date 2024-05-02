@@ -1104,8 +1104,44 @@ def descriptorTest( inpChunk1:Chunk, inpChunk2:Chunk ):
     inpChunk1.determineErrorKeypoints( inpChunk2, np.array((0,0,0)), True )
     
     ""
+def descriptorTestExt( inpChunk :Chunk ):
+    
+    #fancyPlot( inpChunk2.cachedProbabilityGrid.mapEstimate )
+    #plt.show()
+    
+    inpChunk.constructProbabilityGrid().extractDescriptors( plotThingy=True )
+    
+    ""
 
+from ImageProcessor import ImageProcessor
+from CommonLib import gaussianKernel
 
+def frameTestMaxs( chunk:Chunk ): 
+    
+    x1,x2,y1,y2 = 5,150  , 250,395
+    
+    plt.figure(124890)
+    plt.imshow( chunk.constructProbabilityGrid().mapEstimate   , origin="lower" )
+    plt.axis('off')
+    #plt.xlim(x1, x2)
+    #plt.ylim(y1, y2)
+
+    
+    plt.figure(124891)
+    lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( chunk.constructProbabilityGrid().mapEstimate, gaussianKernel(4) )
+    
+    maxPosX, maxPosY, maxInt = ImageProcessor.findMaxima( Rval, 5, 0.01 )
+    
+    
+    plt.imshow( Rval , origin="lower" )
+    plt.plot( maxPosX, maxPosY, "rx" )
+    plt.xlim(x1, x2)
+    plt.ylim(y1, y2)
+    plt.axis('off')
+    
+    plt.show( block=False )
+    
+    ""
  
 
 

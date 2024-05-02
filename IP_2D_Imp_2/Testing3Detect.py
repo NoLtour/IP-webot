@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def generate_circle_image(radius, function, resolution=7, size=7):
+def generate_circle_image(radius, function, resolution=13, size=13):
     # Generate a 2D array to represent the image
     image = np.zeros((size, size))
 
@@ -28,7 +28,7 @@ def thickness_function(theta):
     return np.sin(theta*2)  + np.cos(theta*6)*0.2  + np.sin(theta*0.2)*0.3  + 0.3  # Example function, adjust as needed
 
 # Define circle radius
-radius = 2
+radius = 12
 
 # Generate circle image using the provided function
 circle_image = generate_circle_image(radius, thickness_function)
@@ -84,7 +84,7 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
     plt.figure(4)
     plt.imshow( y_coords*intrestMask )
     plt.figure(5)
-    plt.imshow( angles*intrestMask )
+    plt.imshow( np.where( intrestMask, angles, np.inf) )
     plt.figure(7)
     plt.plot( outputs, "b" )
     plt.plot( alignedOutputs, "r" )
@@ -95,7 +95,7 @@ def findOrientations( inpImage:np.ndarray, oRes:int ):
 
     ""
 
-findOrientations( circle_image, 24 )
+findOrientations( circle_image, 8 )
 
 # Display the constructed circle image
 plt.imshow(circle_image, cmap='gray')

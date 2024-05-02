@@ -35,8 +35,8 @@ def gaussian_kernel2( sigma ):
 # At -1 it does thingy, returns [pos], [I]
 def findMaxima( inpArray:np.ndarray, threshHold = -1, maskSize = 3 ):
     filterDims = (maskSize,)*inpArray.ndim
-    localMaximums = np.where( (inpArray == maximum_filter(inpArray, size=filterDims, mode='constant')) | (inpArray == minimum_filter(inpArray, size=filterDims, mode='constant')) )
-    localIntensities = laplace( inpArray )[ localMaximums ]
+    localMaximums = np.where( (inpArray == maximum_filter(inpArray, size=filterDims, mode='constant')) )#| (inpArray == minimum_filter(inpArray, size=filterDims, mode='constant')) )
+    localIntensities = inpArray[ localMaximums ]
     
     if ( threshHold == -1 ):
         threshHold = np.max( np.abs(localIntensities) ) * 0.1
@@ -232,15 +232,15 @@ class SIFT_thing:
     def downSample(this, inpImage:np.ndarray, scaleFactor:float):
         
         return np.stack( [
-            zoom( inpImage[:,:,0], 1/scaleFactor ),
-            zoom( inpImage[:,:,1], 1/scaleFactor ),
-            zoom( inpImage[:,:,2], 1/scaleFactor ),
-            zoom( inpImage[:,:,3], 1/scaleFactor )            
+            zoom( inpImage , 1/scaleFactor ),
+            zoom( inpImage , 1/scaleFactor ),
+            zoom( inpImage , 1/scaleFactor ),
+            zoom( inpImage , 1/scaleFactor )            
         ], axis=-1 )
 
 # Load the image using PIL (Python Imaging Library) 
-image_path = 'C:\\IP webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-05_16.20.47.png'
-image_path = 'C:\\IP webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\CaptureBB.png'
+image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-05_16.20.47.png'
+image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\SSSSSSSSSSSSSSSSSSSSSSSSSS2.png'
 #image_path = 'C:\\IP-webot\\simulation_zeroros-main\\misc\\SIFT ex\\mcImages\\2024-02-02_16.56.42.png'
  
 img = Image.open(image_path)
@@ -358,34 +358,38 @@ def angling():
 
 
 def peaking2():
-    guassian = gaussian_kernel( 3, 0.1 ) 
+    guassian = gaussian_kernel( 3, 0.001 ) 
     """plt.figure(4)
     plt.imshow( img_array  )  
     return"""
     
     ST = SIFT_thing()
-    hMap = convolve2d( ST.downSample( img_array, 2 ).transpose()[0].transpose(), guassian, mode="same" ) 
+    hMap = convolve2d( ST.downSample( img_array, 1 ).transpose()[0].transpose(), guassian, mode="same" ) 
     yGrad, xGrad = np.gradient( hMap )  
 
+    Rval, l1, l2 = guassianCornerDist( hMap, gaussian_kernel(9, 5) )
     # Find local maxima using maximum_filter
-    local_maxima, intenisy = findMaxima( hMap )
+    local_maxima, intenisy = findMaxima( Rval, -1, 13 )
     
     # eigenvalues
-    Rval, l1, l2 = guassianCornerDist( hMap, gaussian_kernel(9, 5) )
     
-    plt.imshow( hMap, cmap='Reds' )  
+    plt.imshow( hMap, cmap='gray' )  
     
-    lowRFilter = Rval[local_maxima[:,0],local_maxima[:,1]]>(333)
+    lowRFilter = Rval[local_maxima[:,0],local_maxima[:,1]]>(0.001)
     local_maxima = local_maxima[lowRFilter]
     
     for point in local_maxima:
-        plt.plot(point[1], point[0], 'bx' )
-    
+        plt.plot(point[1], point[0], 'rx' )
+     
     plt.figure(4)
     #plt.imshow( np.abs(laplace( hMap ))  )
-    plt.imshow( Rval  )
+    plt.axis('off')
+    bar = plt.imshow( Rval  )
+    plt.colorbar( bar )
+    plt.title("R values")
     
     plt.figure( 5 )
+    plt.axis('off')
      
     occ, ppp = np.unique((intenisy), return_counts=True)
     plt.bar(occ, ppp)

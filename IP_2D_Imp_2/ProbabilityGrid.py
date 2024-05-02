@@ -331,7 +331,7 @@ class ProbabilityGrid:
         
         #plt.show()
 
-    def extractDescriptors( this ):
+    def extractDescriptors( this, plotThingy=False ):
         if ( this.asKeypoints != None ):
             return
         
@@ -341,8 +341,8 @@ class ProbabilityGrid:
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 3.5, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24 )
-        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24 ) 
+        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24, plotThingy=plotThingy  )
+        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24, plotThingy=plotThingy ) 
 
         # plt.figure( 415 )
         # plt.clf()
