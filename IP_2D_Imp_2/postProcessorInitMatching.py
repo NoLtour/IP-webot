@@ -24,7 +24,7 @@ import PPLib as pl
 
 print("importing...")
 #allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST2_rawInpData-2" )
-allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-4" )
+allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-5" )
 print("imported")
 
 
@@ -112,8 +112,7 @@ def testtt():
     target1 = pl.getChunk( allScanData, 0 )
     target2 = pl.getChunk( allScanData, 0 )
     
-    #pl.errorTester( target1 )
-    
+    #pl.errorTester( target1 ) 
     #pl.findDifference( target1, target2, np.array((0.2,0.0,0.0)), 100, True  )
     #pl.twoFramesTest( target1, target2 )
     #pl.featurelessAutoTune( pl.getChunk( allScanData, 0 ) ) 
@@ -134,15 +133,16 @@ def testtt():
 
 #pl.plotPathError( allScanData ) 
 
-testtt()
+#testtt()
  
 def test1ChunkExport(): 
     pl.meanFeaturelessAutoTune( allScanData, 6 )
     
     #pl.config.FEATURELESS_X_ERROR_SCALE,pl.config.FEATURELESS_Y_ERROR_SCALE,pl.config.FEATURELESS_A_ERROR_SCALE = 2, 2, 0.1 
  
-    procScans = pl.getBaseChunks(allScanData, 0, 10, 99999999 )
-    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ -1,4,3,9,8,7,6,5,2,1,-3,-6 ], minFrameError=100 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
+    procScans = pl.getBaseChunks(allScanData, 2, 20, 99999999 )
+    #merged1 = pl.mapMergeTestRec( procScans, 99999999, [ -1,4,3,9,8,7,6,5,2,1,-3,-6 ], minFrameError=100 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
+    merged1 = pl.mapMergeTestRec( procScans, 99999999, [ 5,4,3,2 ], minFrameError=100 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     merged1[0].graphSLAM.plot() 
     
     # merged1[0].randomHybridErrorReduction( 60 )

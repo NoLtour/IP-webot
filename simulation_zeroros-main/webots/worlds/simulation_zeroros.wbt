@@ -134,7 +134,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation -3.95 2 0.4
+  translation -1.96 2 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -164,7 +164,7 @@ DEF PINK_OBJECT3 Solid {
   }
 }
 DEF PINK_OBJECT3 Solid {
-  translation 1.06 2 0.4
+  translation 0.08 3.98 0.4
   children [
     DEF CYLINDER_SHAPE Shape {
       appearance PBRAppearance {
@@ -337,7 +337,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999997966 0.075
+        translation 0 0.1349999999999796 0.075
         rotation 0.6492952158314748 -0.6492953991282648 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
