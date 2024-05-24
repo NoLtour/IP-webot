@@ -26,7 +26,7 @@ class IPConfig:
     #CONFLICT_MULT_GAIN          = 0
 
     # Minimiser featureless adjuster
-    MINIMISER_MAX_LOOP = 350
+    MINIMISER_MAX_LOOP = 150
 
     # Scan propreties
     MAX_LIDAR_LENGTH = 8

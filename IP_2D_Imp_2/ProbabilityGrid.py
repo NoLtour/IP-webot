@@ -341,8 +341,14 @@ class ProbabilityGrid:
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 3.5, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24, plotThingy=plotThingy  )
-        #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24, plotThingy=plotThingy ) 
+        gradExt = True
+        channelz = 12
+
+        descriptors, intrestPoints, angleAlignment = 0,0,0
+        if ( not gradExt ):
+            descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, channelz, plotThingy=plotThingy  )
+        else:
+            descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, channelz, plotThingy=plotThingy ) 
 
         # plt.figure( 415 )
         # plt.clf()
@@ -371,8 +377,11 @@ class ProbabilityGrid:
             lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 4, 0.02 )  )
             intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 9 )
 
-            #descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, 24 )
-            descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, 24 ) 
+            descriptors, intrestPoints, angleAlignment = 0,0,0
+            if ( not gradExt ):
+                descriptors, intrestPoints, angleAlignment = ImageProcessor.extractThicknesses( this.mapEstimate, intrestX, intrestY, descRad, channelz )
+            else:
+                descriptors, intrestPoints, angleAlignment = ImageProcessor.extractGradients( this.mapEstimate, intrestX, intrestY, descRad, channelz ) 
 
             # plt.figure( 415 )
             # plt.clf()

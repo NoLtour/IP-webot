@@ -28,14 +28,12 @@ config = pl.config
 
 print("importing...")
 #allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST2_rawInpData-2" )
-allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-4" )
+allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-5" )
 print("imported")
 
 #pl.plotPathError( allScanData )
 # Noise step
 np.random.seed(3115)
-
-
 if (True):
     allPoseChanges = [ (0,0) ]
     cccc = []
@@ -93,7 +91,6 @@ if (True):
     # plt.show(block=False)
     ""
     
-    
 config = IPConfig() 
 
  
@@ -102,6 +99,16 @@ config = IPConfig()
     
 """
 
+def massTesting1():
+    #pl.meanFeaturelessAutoTune( allScanData, 5 )
+    pl.featurelessAutoTune( pl.getChunk(allScanData, 1) )
+    procScans = pl.getBaseChunks(allScanData, 1, 10, 800 )
+    merged1 = pl.mapMergeTestRec( procScans, 99999999, [], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
+    parent = merged1[0]
+
+    pl.massInterframeTesting( parent )
+
+massTesting1()
 
 #pl.descriptorTest( pl.getChunk( allScanData, 250 ), pl.getChunk( allScanData, 280 ) )
 pl.descriptorTestExt( pl.getChunk( allScanData, 0 ) )

@@ -936,10 +936,6 @@ def minimiserEffectivenessTest( parent:Chunk, sampleCount, compDistance ):
     plt.show( block=False )
     
     ""
-        
-        
-        
-        
     
 
 def autoTunePlot( allData:list[RawScanFrame], interval=0 ):
@@ -1143,7 +1139,73 @@ def frameTestMaxs( chunk:Chunk ):
     
     ""
  
-
+def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,4,8,16,32 ] ):
+    
+    def MIT_internal( parent:Chunk, sampleCount, compDistance ):
+        initErrors = []
+        newErrors = []
+        
+        leeen = len(parent.subChunks)-(compDistance+1)
+        skipDis = max(1, int((leeen)/sampleCount))
+        
+        for i in range( 0, leeen, skipDis ):
+            rootCh = parent.subChunks[i]
+            targCh = parent.subChunks[i+compDistance]
+            
+            # MODIFY
+            #offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 10, scoreRequired=260, forcedOffset=np.zeros(3) )
+            offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessMinimum( targCh, 220, np.zeros(3), scoreRequired=260 )
+            
+            
+            initVector = rootCh.getLocalOffsetFromTarget( targCh )
+            newVector = initVector + offsetAdjustment
+            
+            trueVector = rootCh.getTRUEOffsetLocal( targCh )
+            
+            initErrors.append( (np.abs( initVector[0] - trueVector[0] ), np.abs( initVector[1] - trueVector[1] ), acuteAngle( initVector[2], trueVector[2] )) )
+    
+            newErrors.append( (np.abs( newVector[0] - trueVector[0] ), np.abs( newVector[1] - trueVector[1] ), acuteAngle( newVector[2], trueVector[2] )) )
+            
+            #print( "vecs:", trueVector, newVector, np.abs( newVector - trueVector ) )
+            ""
+        
+        initErrors = np.array( initErrors )
+        newErrors  = np.array( newErrors )
+        
+        np.isnan
+        
+        notNull = (1!=np.isnan(newErrors[:,0]))
+        
+        print( "init score: ", np.mean( np.sqrt(initErrors[:,0][notNull]**2+initErrors[:,1][notNull]**2) ) )
+        print( "final score: ", np.mean( np.sqrt(newErrors[:,0][notNull]**2+newErrors[:,1][notNull]**2) ) )
+        print( "Ainit score: ", np.mean( initErrors[:,2][notNull] ) )
+        print( "Afinal score: ", np.mean( newErrors[:,2][notNull] ) )
+        
+        plt.figure(2409)
+        plt.title( "Translation Error" )
+        plt.plot( np.sqrt(initErrors[:,0]**2+initErrors[:,1]**2), "r-", label="init error" )
+        plt.plot( np.sqrt(newErrors[:,0]**2+newErrors[:,1]**2), "b--", label="final error" )
+        plt.legend()
+        
+        plt.figure(2109)
+        plt.plot( (initErrors[:,2] ), "r-", label="init error" )
+        plt.plot(  (newErrors[:,2] ), "b--", label="final error" )
+        plt.legend()
+        plt.title( "Angle Error" )
+        plt.show( block=False )
+        
+        return initErrors, newErrors, notNull
+    
+    allResults = []
+    
+    for compDist in compDistances:
+        print("starting on ", compDist)
+        initErrors, newErrors, notNull = MIT_internal( parent, 999999999, compDist )
+        
+        allResults.append( [initErrors, newErrors, notNull] )
+    
+    ""
+    
 
 
 
