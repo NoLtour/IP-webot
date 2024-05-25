@@ -27,8 +27,8 @@ gridDisp2     = pl.gridDisp2
 config = pl.config
 
 print("importing...")
-#allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST2_rawInpData-2" )
-allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-5" )
+allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST2_rawInpData-2" )
+#allScanData:list[RawScanFrame] = RawScanFrame.importScanFrames( "TEST1_LinearMatchedData-5" )
 print("imported")
 
 #pl.plotPathError( allScanData )
@@ -100,13 +100,21 @@ config = IPConfig()
 """
 
 def massTesting1():
-    #pl.meanFeaturelessAutoTune( allScanData, 5 )
+    maxIndex = int(7000/5) 
+    #maxIndex = int(7000/20) 
+    
+    #pl.meanFeaturelessAutoTune( allScanData[0:maxIndex], 5 )
     pl.featurelessAutoTune( pl.getChunk(allScanData, 1) )
-    procScans = pl.getBaseChunks(allScanData, 1, 10, 800 )
+    procScans = pl.getBaseChunks(allScanData, 1, 5, maxIndex )
     merged1 = pl.mapMergeTestRec( procScans, 99999999, [], minFrameError=70 )#  9,8,7,6,5,4,3,2,1,15,14,12,10,8,6,3,2,1,3,2,1 
     parent = merged1[0]
 
     pl.massInterframeTesting( parent )
+
+#pl.singleMinTest( pl.getChunk( allScanData, 30 ) )
+
+#pl.plotPathError( allScanData )
+#pl.errorTester( pl.getChunk( allScanData, 0 ) ) 
 
 massTesting1()
 

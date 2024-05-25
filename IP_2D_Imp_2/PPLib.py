@@ -138,7 +138,7 @@ def featurelessFullTest( inpChunk ):
 
     plt.show( block=False )
 
-def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(4) ):
+def featurelessAutoTune( inpChunk, tuneXOffset=0.14, tuneYOffset=0.14, tuneAOffset=np.deg2rad(5) ):
     inpChunk.config.FEATURELESS_X_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_Y_ERROR_SCALE = 1
     inpChunk.config.FEATURELESS_A_ERROR_SCALE = 0
@@ -411,17 +411,17 @@ def determineErrorCoupling( inpChunk:Chunk, scenarioCount=100 ):
     plt.show() 
 
 
-def errorTester( inpChunk:Chunk ):   
-    xOffsets = np.arange( -1.35, 1.35, 0.025 )
-    yOffsets = np.arange( -1.35, 1.35, 0.025 )
+def errorTester( inpChunk:Chunk ):    
+    xOffsets = np.arange( -0.5, 0.51, 0.01 )
+    yOffsets = np.arange( -0.5, 0.51, 0.01 ) 
 
     yO, xO = np.meshgrid( xOffsets, yOffsets )
     rO = np.zeros( xO.shape )
 
     offsetTests = np.column_stack( (xO.flatten(), yO.flatten(), rO.flatten()) )
     offsetErrors = []
-
-    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.25 ))
+ 
+    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.1 )) 
     rotationErrors = []
 
     for offsetTest in offsetTests:
@@ -432,20 +432,23 @@ def errorTester( inpChunk:Chunk ):
         errorScore, overlapArea = inpChunk.determineDirectDifference( inpChunk, np.array( (0,0,rotationTest) ) )
         rotationErrors.append( errorScore )
 
+    normVal = np.max(np.array( offsetErrors ))
+
     plt.figure(1512)
     """plt.xticks(np.arange( -0.3, 0.3, 0.1 ))
     plt.yticks(np.arange( -0.3, 0.3, 0.1 ))"""
-    bar = plt.imshow(np.array( offsetErrors ).reshape( xO.shape ), extent=[np.min(xOffsets), np.max(xOffsets), np.min(yOffsets), np.max(yOffsets)]) 
-    plt.colorbar( bar )
+    bar = plt.imshow(np.array( offsetErrors ).reshape( xO.shape )/normVal, extent=[np.min(xOffsets), np.max(xOffsets), np.min(yOffsets), np.max(yOffsets)]) 
+    plt.colorbar( bar ).set_label("error score/max error")
     plt.title("error function output for known displacement error")
     plt.xlabel("x displacement error")
     plt.ylabel("y displacement error")
 
+    normVal = np.max(np.array( rotationErrors ))
     plt.figure(1514)
-    plt.plot( np.rad2deg(rotationTests), np.array(rotationErrors) )
+    plt.plot( np.rad2deg(rotationTests), np.array(rotationErrors) /normVal)
     plt.title("error function output for known rotational error")
     plt.xlabel("rotation error (deg)")
-    plt.ylabel("error score")
+    plt.ylabel("error score/max error")
     plt.show()
 
     "4"
@@ -453,6 +456,7 @@ def errorTester( inpChunk:Chunk ):
 def method1Tester( inpChunk ):   
     xOffsets = np.arange( -0.5, 0.51, 0.065 )
     yOffsets = np.arange( -0.5, 0.51, 0.065 ) 
+    
 
     yO, xO = np.meshgrid( xOffsets, yOffsets )
     rO = np.zeros( xO.shape )
@@ -991,7 +995,7 @@ def twoFramesTest( chunk1, chunk2 ):
     
     chunks[0].plotDifference( chunks[1], np.zeros(3) )
     #offsetAdjustment, newErrorScore = chunks[0].determineErrorFeaturelessDirect( chunks[1], 15, np.array((0.0,0,0)), True )
-    #offsetAdjustment, newErrorScore = chunks[0].determineErrorFeatureless3( chunks[1],  np.array((0,0,0)), True )
+    offsetAdjustment, newErrorScore = chunks[0].determineErrorFeaturelessMinimum( chunks[1], 200, forcedOffset=np.array((0.1,0,0)) )
     
     chunks[0].plotDifference( chunks[1], np.zeros(3) )
     
@@ -1042,7 +1046,7 @@ def mergeFrameRecursive( allScanData, frameCount, batchSize ):
  
 
 def singleMinTest( testingChunk:Chunk ): 
-    setOffset = np.array(( -0.18, 0.18, np.deg2rad(20) ))
+    setOffset = np.array(( -0.06, 0.06, np.deg2rad(4) ))
     previousError, aaaaaaaa  = testingChunk.determineDirectDifference( testingChunk, setOffset, False )
     
     testingChunk.plotDifference( testingChunk, setOffset )
@@ -1139,11 +1143,13 @@ def frameTestMaxs( chunk:Chunk ):
     
     ""
  
-def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,4,8,16,32 ] ):
+def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,2,4,6,8,14,24,40 ] ):
     
     def MIT_internal( parent:Chunk, sampleCount, compDistance ):
         initErrors = []
         newErrors = []
+        initErrorScores = []
+        newErrorScores = []
         
         leeen = len(parent.subChunks)-(compDistance+1)
         skipDis = max(1, int((leeen)/sampleCount))
@@ -1152,10 +1158,13 @@ def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,4,8,16,32
             rootCh = parent.subChunks[i]
             targCh = parent.subChunks[i+compDistance]
             
+            initErrorScore, area = rootCh.determineDirectDifference( targCh, forcedOffset=np.zeros(3) )
+            initErrorScores.append( initErrorScore )
+            
             # MODIFY
             #offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 10, scoreRequired=260, forcedOffset=np.zeros(3) )
-            offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessMinimum( targCh, 220, np.zeros(3), scoreRequired=260 )
-            
+            offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessMinimum( targCh, 250, np.zeros(3), scoreRequired=260 )
+            newErrorScores.append( newErrorScore )
             
             initVector = rootCh.getLocalOffsetFromTarget( targCh )
             newVector = initVector + offsetAdjustment
@@ -1171,8 +1180,8 @@ def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,4,8,16,32
         
         initErrors = np.array( initErrors )
         newErrors  = np.array( newErrors )
-        
-        np.isnan
+        initErrorScores  = np.array( initErrorScores )
+        newErrorScores  = np.array( newErrorScores ) 
         
         notNull = (1!=np.isnan(newErrors[:,0]))
         
@@ -1194,15 +1203,15 @@ def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,4,8,16,32
         plt.title( "Angle Error" )
         plt.show( block=False )
         
-        return initErrors, newErrors, notNull
+        return initErrors, newErrors, notNull, initErrorScores, newErrorScores
     
     allResults = []
     
     for compDist in compDistances:
         print("starting on ", compDist)
-        initErrors, newErrors, notNull = MIT_internal( parent, 999999999, compDist )
+        initErrors, newErrors, notNull, initErrorScores, newErrorScores = MIT_internal( parent, 999999999, compDist )
         
-        allResults.append( [initErrors, newErrors, notNull] )
+        allResults.append( [initErrors, newErrors, notNull, initErrorScores, newErrorScores] )
     
     ""
     

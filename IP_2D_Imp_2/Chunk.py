@@ -533,16 +533,16 @@ class Chunk:
         
         #print( "\n\ninitOffset:", this.getOffset()*40 )
 
-        toTransVector = this.getLocalOffsetFromTarget( otherChunk )
+        #toTransVector = this.getLocalOffsetFromTarget( otherChunk )
         
         
-        initErrorScore, overlapArea = this.determineDirectDifference( otherChunk, toTransVector + forcedOffset, True ) 
+        initErrorScore, overlapArea = this.determineDirectDifference( otherChunk,  forcedOffset ) 
         
        # this.awoijd = 0
         def interpFunc( offsets ): 
             #this.awoijd+=1
-            error, area = this.determineDirectDifference( otherChunk, offsets + forcedOffset, True )
-            #print(this.awoijd, error, offsets )
+            error, area = this.determineDirectDifference( otherChunk, offsets + forcedOffset )
+            #print(error, offsets )
 
             if (np.isnan(error)):
                 return 9999999999
@@ -550,10 +550,10 @@ class Chunk:
             return error
 
         #initChange = np.array(( 5/this.config.GRID_RESOLUTION, 5/this.config.GRID_RESOLUTION, np.deg2rad(5) ))
-        bounds     = ( (-0.5,0.5), (-0.5,0.5), (-np.pi/2, np.pi/2) ) 
+        bounds     = ( (-0.3,0.3), (-0.3,0.3), (-np.pi/5, np.pi/5) ) 
         #nm = differential_evolution( interpFunc, bounds, x0=toTransVector, maxiter=5, strategy="currenttobest1exp")
-        #nm = minimize( interpFunc, toTransVector,  method="COBYLA", options={ 'maxiter': iterCap } )
-        nm = minimize( interpFunc, toTransVector,  method="Powell", bounds=bounds, options={ 'maxfev': iterCap, 'maxiter': iterCap, "ftol":1 } )
+        #nm = minimize( interpFunc, np.zeros(3),  method="COBYLA", options={ 'maxfun': iterCap, 'rhobeg': [0.05,0.05,0.05] } )
+        nm = minimize( interpFunc, np.zeros(3),  method="Powell", bounds=bounds, options={ 'maxfev': iterCap, 'maxiter': iterCap, "ftol":1 } )
     
         """
         COBYLA -> 97
@@ -562,9 +562,9 @@ class Chunk:
         """
     
         trueOffset = np.array(( nm.x[0], nm.x[1], nm.x[2] )) 
-        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset + forcedOffset, True )
+        errorScore, overlapArea = this.determineDirectDifference( otherChunk, trueOffset + forcedOffset )
         
-        foundDirectionErrors =  -(toTransVector - trueOffset)
+        foundDirectionErrors =  ( trueOffset)
 
         if (updateOffset):
              this.updateOffset(
@@ -668,16 +668,15 @@ class Chunk:
 
         thisPositive  = np.maximum( thisWindow,  0 )
         transPositive = np.maximum( transWindow, 0 )
-        #thisWindow = np.where( thisPositive, thisWindow*10, thisWindow )
-        #transWindow = np.where( transPositive, transWindow*10, transWindow )
-        #posThisWin = np.where( thisWindow>0, thisWindow, 0 )
-        #posTransWin = np.where( transWindow>0, thisWindow, 0 )
-
-        #possibleOverlap = min( np.sum(posThisWin), np.sum(posTransWin) )
+        
+        #thisNeg  = -np.minimum( thisWindow,  0 )
+        #transNeg = -np.minimum( transWindow, 0 ) 
+        
 
         errorWindow = (thisWindow*transWindow)
-        #mArea = np.sum(np.abs(errorWindow) ) 
-        mArea = np.sum( (thisPositive+transPositive)*np.abs(errorWindow) ) 
+        
+        mArea = np.sum( (thisPositive+transPositive  )*np.abs(errorWindow) ) 
+        #mArea = np.sum( (thisPositive+transPositive + 0.01*(thisNeg+transNeg) )*np.abs(errorWindow) ) 
         
         #if (mArea<10): return np.nan, np.nan 
         misMatchWindow = -np.minimum( errorWindow, 0 ) 
