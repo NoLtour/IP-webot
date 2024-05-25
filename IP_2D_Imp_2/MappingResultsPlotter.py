@@ -160,6 +160,9 @@ namez = ["12 channels", "24 channels", "36 channels", "48 channels" ]
 dsets = [vol12CHHybr, vol24CHHybr, vol36CHHybr, vol48CHHybr ]
 namez = ["12 channels", "24 channels", "36 channels", "48 channels"  ]
 
+dsets = [fsoeMedian, grad24CHHybr, vol36CHHybr ]
+namez = ["FSOE Median", "24 channel gradient desc", "36 channel intensity desc"  ]
+
 
 plotPositionErrors(dsets, namez )
 plotAngularErrors(dsets, namez )

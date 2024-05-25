@@ -2,7 +2,7 @@ import g2o
 
 import numpy as np
 
-import plotly.graph_objects as go 
+#import plotly.graph_objects as go 
 
 """
     This is basically all taken from https://github.com/miquelmassot/g2o-python
