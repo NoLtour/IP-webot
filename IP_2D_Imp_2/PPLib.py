@@ -1163,7 +1163,10 @@ def massInterframeTesting( parent:Chunk, compDistances:list[int] = [ 1,2,4,6,8,1
             
             # MODIFY
             #offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessDirect( targCh, 10, scoreRequired=260, forcedOffset=np.zeros(3) )
-            offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessMinimum( targCh, 250, np.zeros(3), scoreRequired=260 )
+            #offsetAdjustment, newErrorScore = rootCh.determineErrorFeaturelessMinimum( targCh, 250, np.zeros(3), scoreRequired=260 )
+            #offsetAdjustment, newErrorScore = rootCh.determineOffsetKeypoints( targCh, np.zeros(3), scoreRequired=300, returnOnPoorScore=True )
+            offsetAdjustment, newErrorScore = rootCh.determineHybridErrorReduction( targCh, np.zeros(3), scoreRequired=300 )
+            
             newErrorScores.append( newErrorScore )
             
             initVector = rootCh.getLocalOffsetFromTarget( targCh )

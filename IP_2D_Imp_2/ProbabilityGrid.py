@@ -341,8 +341,8 @@ class ProbabilityGrid:
         lambda_1, lambda_2, Rval = ImageProcessor.guassianCornerDist( this.mapEstimate, gaussianKernel( 3.5, 0.02 )  )
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
-        gradExt = True
-        channelz = 12
+        gradExt = False
+        channelz = 48
 
         descriptors, intrestPoints, angleAlignment = 0,0,0
         if ( not gradExt ):
@@ -394,8 +394,8 @@ class ProbabilityGrid:
             #     plt.plot(  desc  )
             #     plt.show( block=False ) 
             ""
-
-            this.featureDescriptors = np.concatenate((this.featureDescriptors, descriptors.astype(np.float32)), axis=0)    
+            if ( descriptors.size != 0 ):
+                this.featureDescriptors = np.concatenate((this.featureDescriptors, descriptors.astype(np.float32)), axis=0)    
 
             for desc, pos, angle in zip( this.featureDescriptors, intrestPoints, angleAlignment ):
                 this.asKeypoints.append( KeyPoint( float(pos[0]), float(pos[1]), extSize, angle=float(angle) ) )

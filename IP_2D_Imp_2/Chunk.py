@@ -628,6 +628,19 @@ class Chunk:
         print( "did it:",newErrorScore )
         return offsetAdjustment, newErrorScore
     
+    def determineHybridErrorReduction( this, otherChunk:Chunk, forcedOffset:np.ndarray, scoreRequired=99999999, maxImpScore=0 ):
+        """ sequentially through all children of this chunk, reducing the error using the selected reduction method
+        it applies the reduction by comparing all children to the centre
+           """  
+              
+        adjustmentOffset, errorScore = this.determineOffsetKeypoints( otherChunk, forcedOffset, False, returnOnPoorScore=True )
+        
+        if ( np.isnan(errorScore) ):
+            #rootChunk.determineErrorFeaturelessDirect( targetChunk, 6, np.zeros(3), True, scoreRequired=140 )
+            return adjustmentOffset, errorScore
+        else:
+            return this.determineErrorFeaturelessDirect( otherChunk, 9, adjustmentOffset, False, scoreRequired=scoreRequired, maxImpScore=maxImpScore )
+    
     def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray, updateOffset=False, scoreRequired=99999999, returnOnPoorScore=False, maxImpScore=0 ):
         """ This finds the relative offset between two chunks using features  """
           
@@ -638,7 +651,7 @@ class Chunk:
             return np.nan, np.nan
         
         newOffset, wasSuccess = this.determineErrorKeypoints( otherChunk, forcedOffset )
-        if ( not wasSuccess ):
+        if ( not wasSuccess or ( np.sum( np.isnan( newOffset ) ) ) ):
             return np.nan, np.nan
         
         newErrorScore, overlapRegion  = this.determineDirectDifference( otherChunk, newOffset, True )

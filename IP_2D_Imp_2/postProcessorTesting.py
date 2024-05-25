@@ -101,7 +101,6 @@ config = IPConfig()
 
 def massTesting1():
     maxIndex = int(7000/5) 
-    #maxIndex = int(7000/20) 
     
     #pl.meanFeaturelessAutoTune( allScanData[0:maxIndex], 5 )
     pl.featurelessAutoTune( pl.getChunk(allScanData, 1) )
