@@ -7,6 +7,6 @@ centralWidgetVisible: 1
 projectionMode: PERSPECTIVE
 renderingMode: PLAIN
 orthographicViewHeight: 1
-textFiles: 0 "../webots - 2/controllers/webots_controller/webots_controller.py"
+textFiles: 0 "controllers/webots_controller/webots_controller.py"
 globalOptionalRendering: LidarPointClouds::LidarRaysPaths::ContactPoints
 consoles: Console:All:All

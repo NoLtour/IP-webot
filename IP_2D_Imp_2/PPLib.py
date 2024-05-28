@@ -791,7 +791,7 @@ def mapMergeTestRec( inputData:list[Chunk], chunkSize, mergeMethod:list[int], mi
             
             parentChunk = Chunk.initEmpty( config )
 
-            parentChunk.addChunks( rawStack )
+            parentChunk.addChunks( rawStack, 0 )
 
             # parentChunk.subChunks[0].determineErrorKeypoints( parentChunk.subChunks[1], np.zeros(3), True )
             # parentChunk.subChunks[0].determineErrorKeypoints( parentChunk.subChunks[1], np.zeros(3), True )

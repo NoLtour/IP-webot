@@ -4,6 +4,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/objects/floors/protos/RectangleArena.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/appearances/protos/DryMud.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/cb1af9e3bbe43a138b70fe67552cfcc8c7fe1e11/projects/appearances/protos/Parquetry.proto"
 
 WorldInfo {
   info [
@@ -31,7 +32,7 @@ WorldInfo {
 }
 Viewpoint {
   orientation -0.5832904050192258 -0.5852813281318128 0.5632211558107245 4.170388239669003
-  position 2.651664751684275 0.8042772866753021 37.52897242344406
+  position 2.654137527860939 0.061576109833339304 58.73874306268593
   follow "MyBot"
 }
 TexturedBackground {
@@ -43,6 +44,9 @@ RectangleArena {
   translation 0 0 -0.2
   floorSize 80 80
   floorTileSize 2 2
+  floorAppearance Parquetry {
+    type "light strip"
+  }
   wallThickness 0.5
 }
 Solid {
@@ -463,7 +467,7 @@ DEF ROBOT Robot {
         }
       ]
       endPoint Solid {
-        translation 0 0.13499999999997944 0.075
+        translation 0 0.1349999999999794 0.075
         rotation 0.6492952158314749 -0.6492953991282647 0.3960192007582788 3.8957326918827726
         children [
           DEF WHEEL Pose {
@@ -511,7 +515,7 @@ DEF ROBOT Robot {
       ]
       endPoint Solid {
         translation 0 -0.13499999999999668 0.075
-        rotation 0.684619863684993 -0.6846198015442219 -0.2501826724245547 2.651291522769957
+        rotation 0.684619863684993 -0.6846198015442219 -0.2501826724245548 2.651291522769957
         children [
           USE WHEEL
         ]

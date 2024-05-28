@@ -121,7 +121,7 @@ class Chunk:
         return asChunks
     
     """ SECTION - mergers? """ 
-    def addChunks( this, subChunks:list[Chunk] ):
+    def addChunks( this, subChunks:list[Chunk], forcedValue=-1  ):
         """ Adds chunks, establishing relations between them """
         if ( len(this.subChunks) != 0 ):
             raise RuntimeError("Not implemented to add to initialized chunk groups")
@@ -130,7 +130,7 @@ class Chunk:
         for nSubChunk in subChunks:
             nSubChunk.parent = this
 
-        this.determineCentreChunk()
+        this.determineCentreChunk( forcedValue )
 
     def determineCentreChunk( this, forcedValue=-1 ):
         """ Sets the centre of this chunk to be the midpoint of the list, it then finds the subchunks relative offsets
@@ -640,6 +640,21 @@ class Chunk:
             return adjustmentOffset, errorScore
         else:
             return this.determineErrorFeaturelessDirect( otherChunk, 9, adjustmentOffset, False, scoreRequired=scoreRequired, maxImpScore=maxImpScore )
+    
+    def outputPoseData(this):
+        ""
+        
+        posez = []
+        tPossez = []
+        
+        for rSF in this.exportAsRaws():
+            posez.append( [rSF.pose.x, rSF.pose.y, rSF.pose.yaw] )
+            tPossez.append( [rSF.truePose.x, rSF.truePose.y, rSF.truePose.yaw] )
+        
+        oup = [ posez, tPossez ]
+        
+        print(oup)
+        return oup
     
     def determineOffsetKeypoints( this, otherChunk:Chunk, forcedOffset:np.ndarray, updateOffset=False, scoreRequired=99999999, returnOnPoorScore=False, maxImpScore=0 ):
         """ This finds the relative offset between two chunks using features  """

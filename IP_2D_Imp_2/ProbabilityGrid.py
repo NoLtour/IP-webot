@@ -342,7 +342,7 @@ class ProbabilityGrid:
         intrestX, intrestY, intensities = ImageProcessor.findMaxima( Rval, 3 )
 
         gradExt = False
-        channelz = 48
+        channelz = 36
 
         descriptors, intrestPoints, angleAlignment = 0,0,0
         if ( not gradExt ):
