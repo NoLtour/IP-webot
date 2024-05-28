@@ -412,8 +412,8 @@ def determineErrorCoupling( inpChunk:Chunk, scenarioCount=100 ):
 
 
 def errorTester( inpChunk:Chunk ):    
-    xOffsets = np.arange( -0.5, 0.51, 0.01 )
-    yOffsets = np.arange( -0.5, 0.51, 0.01 ) 
+    xOffsets = np.arange( -0.05, 0.051, 0.01 )
+    yOffsets = np.arange( -0.05, 0.051, 0.01 ) 
 
     yO, xO = np.meshgrid( xOffsets, yOffsets )
     rO = np.zeros( xO.shape )
@@ -421,7 +421,7 @@ def errorTester( inpChunk:Chunk ):
     offsetTests = np.column_stack( (xO.flatten(), yO.flatten(), rO.flatten()) )
     offsetErrors = []
  
-    rotationTests  = np.deg2rad(np.arange( -60, 60, 0.1 )) 
+    rotationTests  = np.deg2rad(np.arange( -5, 5, 0.005 )) 
     rotationErrors = []
 
     for offsetTest in offsetTests:
@@ -948,7 +948,7 @@ def autoTunePlot( allData:list[RawScanFrame], interval=0 ):
     aSc = []
     Ind = []
     
-    meanFeaturelessAutoTune( allData, 10 )
+    featurelessAutoTune( getChunk( allData, 0 ) )
     mXSC = config.FEATURELESS_X_ERROR_SCALE
     mYSC = config.FEATURELESS_Y_ERROR_SCALE
     mASC = config.FEATURELESS_A_ERROR_SCALE

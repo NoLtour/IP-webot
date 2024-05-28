@@ -112,6 +112,8 @@ def massTesting1():
 
 #pl.singleMinTest( pl.getChunk( allScanData, 30 ) )
 
+#pl.autoTunePlot( allScanData, 3 )
+
 #pl.plotPathError( allScanData )
 #pl.errorTester( pl.getChunk( allScanData, 0 ) ) 
 
